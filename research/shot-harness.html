@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!-- Dev-only screenshot harness: loads the standalone page in an iframe and
+     jumps it to ?y=<scrollY> so headless screenshots can capture scroll states. -->
+<html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%}iframe{width:100vw;height:100vh;border:0;display:block}</style></head>
+<body>
+<iframe></iframe>
+<script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var src = '../src/standalone/index.html';
+    if (params.get('mode')) src += '?mode=' + params.get('mode');
+    document.querySelector('iframe').src = src;
+  })();
+  window.addEventListener('load', function () {
+    var f = document.querySelector('iframe');
+    var params = new URLSearchParams(location.search);
+    var win = f.contentWindow, doc = f.contentDocument;
+    doc.documentElement.style.scrollBehavior = 'auto';
+    var p = params.get('point');
+    if (p !== null) {
+      /* centre the Nth card in the observer band */
+      var card = doc.querySelectorAll('.scrollmap__point')[+p].querySelector('.card');
+      var y = card.getBoundingClientRect().top + win.scrollY
+            - win.innerHeight * 0.5 + card.offsetHeight * 0.5;
+      win.scrollTo(0, y);
+    } else {
+      win.scrollTo(0, +(params.get('y') || 0));
+    }
+    if (params.get('debug')) {
+      setTimeout(function () {
+        var card = doc.querySelectorAll('.scrollmap__point')[+ (p || 0)].querySelector('.card');
+        var r = card.getBoundingClientRect();
+        var pt = card.parentElement.getBoundingClientRect();
+        var dbg = document.createElement('pre');
+        dbg.id = 'debug';
+        var actives = [];
+        doc.querySelectorAll('.scrollmap__point').forEach(function (el, i) {
+          if (el.classList.contains('is-active')) actives.push(i);
+        });
+        var frame = doc.querySelector('.scrollmap__frame');
+        var stage = doc.querySelector('.scrollmap__stage');
+        dbg.textContent = JSON.stringify({
+          innerWidth: win.innerWidth,
+          scrollY: win.scrollY,
+          activePoints: actives,
+          frameStyle: frame ? frame.style.cssText : null,
+          stageTransform: stage ? stage.style.transform : null,
+          railCurrent: Array.prototype.map.call(doc.querySelectorAll('.scrollmap__rail button'), function (b) { return b.getAttribute('aria-current'); }).join(',')
+        });
+        document.body.appendChild(dbg);
+      }, 500);
+    }
+  });
+</script>
+</body></html>

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "wwf/scrollmap",
+  "version": "1.0.0",
+  "title": "Scroll Map",
+  "category": "media",
+  "icon": "location-alt",
+  "description": "Scroll-driven map with a traveling spotlight: a pinned background image, hotspot regions and story cards. Rebuild of the Shorthand 'Scrollpoints' pattern.",
+  "keywords": ["map", "scrollytelling", "hotspot", "spotlight", "wwf"],
+  "textdomain": "wwf-scrollmap",
+  "supports": {
+    "html": false,
+    "multiple": true,
+    "align": ["full"]
+  },
+  "attributes": {
+    "align":        { "type": "string",  "default": "full" },
+    "sectionTitle": { "type": "string",  "default": "Scroll map" },
+    "mode":         { "type": "string",  "default": "cinematic", "enum": ["cinematic", "faithful"] },
+    "backgroundImage": { "type": "object", "default": null },
+    "dimOpacity":     { "type": "number", "default": 0.5 },
+    "highlightColor": { "type": "string", "default": "#2a6788" },
+    "highlightWidth": { "type": "number", "default": 4 },
+    "travelMs":       { "type": "number", "default": 800 },
+    "cardOpacity":    { "type": "number", "default": 0.85 },
+    "points":         { "type": "array",  "default": [] }
+  },
+  "editorScript": "file:./editor.js",
+  "editorStyle":  "file:./editor.css",
+  "style":        "file:./style.css",
+  "viewScript":   "file:./view.js",
+  "render":       "file:./render.php"
+}

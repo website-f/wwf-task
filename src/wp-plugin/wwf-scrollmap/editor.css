@@ -1,0 +1,128 @@
+/**
+ * wwf/scrollmap — editor-only styles: the canvas, hotspot boxes, draw layer
+ * and the inline card preview.
+ */
+
+.wwfsm-editor { max-width: 100%; }
+
+/* --- canvas: the map with hotspot boxes ---------------------------------- */
+.wwfsm-canvas {
+	position: relative;
+	line-height: 0;
+	border-radius: 4px;
+	overflow: hidden;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+	user-select: none;
+}
+.wwfsm-canvas img { width: 100%; height: auto; display: block; }
+.wwfsm-canvas.is-drawing { cursor: crosshair; }
+.wwfsm-canvas.is-drawing img { pointer-events: none; }
+
+.wwfsm-box {
+	position: absolute;
+	background: transparent;
+	border: 3px dashed currentColor;
+	border-color: #2a6788;
+	border-radius: 2px;
+	cursor: pointer;
+	padding: 0;
+	opacity: 0.55;
+	transition: opacity 0.15s ease;
+}
+.wwfsm-box:hover { opacity: 0.9; }
+.wwfsm-box.is-selected {
+	border-style: solid;
+	opacity: 1;
+	box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.25);
+}
+.wwfsm-box.is-drafting { pointer-events: none; }
+
+.wwfsm-box__n {
+	position: absolute;
+	top: -12px;
+	left: -12px;
+	min-width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: #1e1e1e;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 24px;
+	text-align: center;
+}
+
+.wwfsm-canvas__hint {
+	position: absolute;
+	top: 12px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(30, 30, 30, 0.9);
+	color: #fff;
+	font-size: 12px;
+	line-height: 1;
+	padding: 8px 14px;
+	border-radius: 999px;
+	pointer-events: none;
+}
+
+/* --- inline card preview -------------------------------------------------- */
+.wwfsm-cardwrap { display: flex; margin-top: 16px; }
+.wwfsm-cardwrap[data-align="left"]   { justify-content: flex-start; }
+.wwfsm-cardwrap[data-align="center"] { justify-content: center; }
+.wwfsm-cardwrap[data-align="right"]  { justify-content: flex-end; }
+
+.wwfsm-card {
+	width: min(560px, 100%);
+	border-radius: 0.5em;
+	padding: 18px 24px;
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+}
+
+.wwfsm-card__heading {
+	width: 100%;
+	border: none;
+	background: transparent;
+	font-weight: 700;
+	text-transform: uppercase;
+	font-size: 1.4em;
+	line-height: 1.2;
+	padding: 0 0 4px;
+	box-shadow: none;
+}
+.wwfsm-card__heading:focus { outline: 1px dashed #949494; }
+
+.wwfsm-card__body { min-height: 40px; }
+.wwfsm-card__body p { margin: 0.4em 0; }
+
+.wwfsm-card__figure { margin: 12px 0 0; }
+.wwfsm-card__figure img { width: 100%; height: auto; border-radius: 2px; }
+.wwfsm-card__figure figcaption {
+	text-align: center;
+	opacity: 0.6;
+	font-size: 12px;
+	margin-top: 4px;
+}
+
+/* --- sidebar points list --------------------------------------------------- */
+.wwfsm-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.wwfsm-list__row {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px 4px;
+	border-radius: 3px;
+}
+.wwfsm-list__row.is-selected { background: #f0f6fc; box-shadow: inset 0 0 0 1px #3582c4; }
+.wwfsm-list__label {
+	flex: 1;
+	text-align: left;
+	background: none;
+	border: none;
+	padding: 6px 4px;
+	cursor: pointer;
+	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

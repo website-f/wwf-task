@@ -1,0 +1,7 @@
+.Scrollpoints__media[data-attach=after]{height:100vh;position:absolute;left:0;bottom:0}
+.Scrollpoints__media[data-attach=before]{position:absolute;top:0;left:0}
+.Scrollpoints__media[data-attach=during]{position:fixed;top:0;left:0}
+.Scrollpoints__media{width:100%;z-index:0;min-height:100vh}
+.Scrollpoints__point:first-child{padding-top:85vh}
+.Scrollpoints__point{padding-top:50vh;padding-bottom:30vh}
+.Scrollpoints{padding-bottom:20vh}

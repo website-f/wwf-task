@@ -1,0 +1,250 @@
+/**
+ * wwf/scrollmap — front-end styles.
+ * Identical layer model to the standalone Task 1 build; design tokens come in
+ * as CSS custom properties written by render.php from block attributes.
+ */
+
+.wp-block-wwf-scrollmap.scrollmap {
+	/* defaults — render.php overrides these inline from the editor settings */
+	--dim: rgba(0, 0, 0, 0.5);
+	--hl-color: #2a6788;
+	--hl-border: 4px;
+	--hl-speed: 800ms;
+	--card-bg: rgba(255, 255, 255, 0.85);
+
+	position: relative;
+	background: #71bd5f;
+}
+
+/* --- sticky viewport + stage --------------------------------------------- */
+.scrollmap__viewport {
+	position: sticky;
+	top: 0;
+	height: 100vh;
+	height: 100dvh;
+	overflow: hidden;
+}
+
+.scrollmap__stage {
+	position: absolute;
+	inset: 0;
+	transform-origin: 0 0;
+	transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1); /* faithful mode */
+	will-change: transform;
+}
+/* cinematic mode: the spring loop owns every animated property */
+.scrollmap--cinematic .scrollmap__stage,
+.scrollmap--cinematic .scrollmap__frame { transition: none; }
+
+.scrollmap__map {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 50% 50%;
+	max-width: none; /* defend against theme img rules */
+}
+
+/* --- spotlight frame: outline = highlight border, box-shadow = the dim ---- */
+.scrollmap__frame {
+	position: absolute;
+	left: 40%;
+	top: 40%;
+	width: 20%;
+	height: 20%;
+	outline: var(--hl-border) solid var(--hl-color);
+	box-shadow: 0 0 0 200vmax var(--dim);
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		left var(--hl-speed) ease,
+		top var(--hl-speed) ease,
+		width var(--hl-speed) ease,
+		height var(--hl-speed) ease,
+		opacity 0.5s ease;
+}
+.scrollmap__frame.is-active { opacity: 1; }
+
+/* arrival glow: replayed by re-adding .is-arrive (cinematic mode) */
+.scrollmap__frame::after {
+	content: "";
+	position: absolute;
+	inset: calc(-1 * var(--hl-border));
+	opacity: 0;
+	pointer-events: none;
+}
+.scrollmap__frame.is-arrive::after {
+	animation: scrollmap-pulse 0.9s ease-out forwards;
+}
+@keyframes scrollmap-pulse {
+	0% {
+		opacity: 1;
+		box-shadow:
+			0 0 0 2px color-mix(in srgb, var(--hl-color) 90%, transparent),
+			0 0 26px 8px color-mix(in srgb, var(--hl-color) 55%, transparent);
+	}
+	100% {
+		opacity: 0;
+		box-shadow:
+			0 0 0 18px color-mix(in srgb, var(--hl-color) 0%, transparent),
+			0 0 44px 18px color-mix(in srgb, var(--hl-color) 0%, transparent);
+	}
+}
+
+/* --- progress rail (cinematic, ≥900px; built by view.js) ------------------ */
+.scrollmap__rail {
+	position: absolute;
+	right: 18px;
+	top: 50%;
+	translate: 0 -50%;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 12px 8px;
+	background: rgba(0, 0, 0, 0.28);
+	border-radius: 999px;
+	backdrop-filter: blur(4px);
+	z-index: 6;
+}
+.scrollmap__rail button {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	background: rgba(255, 255, 255, 0.45);
+	transition: transform 0.25s ease, background 0.25s ease;
+	position: relative;
+	min-height: 0; /* defend against theme button rules */
+}
+.scrollmap__rail button:hover,
+.scrollmap__rail button:focus-visible { background: #fff; transform: scale(1.25); }
+.scrollmap__rail button[aria-current="true"] { background: #fff; transform: scale(1.45); }
+.scrollmap__rail button .lbl {
+	position: absolute;
+	right: calc(100% + 12px);
+	top: 50%;
+	translate: 0 -50%;
+	background: rgba(0, 0, 0, 0.75);
+	color: #fff;
+	font-size: 12px;
+	line-height: 1;
+	white-space: nowrap;
+	padding: 6px 10px;
+	border-radius: 6px;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.2s ease;
+	pointer-events: none;
+}
+.scrollmap__rail button:hover .lbl,
+.scrollmap__rail button:focus-visible .lbl { opacity: 1; visibility: visible; }
+.scrollmap-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+@media (max-width: 899px) { .scrollmap__rail { display: none; } }
+html:not(.js) .scrollmap__rail { display: none; }
+
+/* --- scroll steps ---------------------------------------------------------- */
+.scrollmap__points {
+	position: relative;
+	z-index: 3;
+	margin-top: -100vh;
+	margin-top: -100dvh;
+	padding-bottom: 20vh;
+}
+
+.scrollmap__point {
+	display: grid;
+	grid-template-columns: repeat(12, 1fr);
+	column-gap: 24px;
+	max-width: 1560px;
+	margin-inline: auto;
+	padding: 50vh 40px 30vh;
+}
+.scrollmap__point:first-child { padding-top: 85vh; }
+
+.scrollmap__point .card                       { grid-column: 4 / span 6; }
+.scrollmap__point[data-align="left"]  .card   { grid-column: 1 / span 6; }
+.scrollmap__point[data-align="right"] .card   { grid-column: 7 / span 6; }
+
+.scrollmap__point .card {
+	background: var(--card-bg);
+	border-radius: 0.5em;
+	padding: 20px 28px;
+	opacity: 0;
+	transform: translateY(30px) scale(0.985);
+	transition: opacity 0.65s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.scrollmap__point .card > * {
+	opacity: 0;
+	transform: translateY(14px);
+	transition: opacity 0.55s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.scrollmap__point .card > *:nth-child(2) { transition-delay: 0.07s; }
+.scrollmap__point .card > *:nth-child(3) { transition-delay: 0.14s; }
+.scrollmap__point .card > *:nth-child(4) { transition-delay: 0.21s; }
+.scrollmap__point .card.is-revealed,
+.scrollmap__point .card.is-revealed > * { opacity: 1; transform: none; }
+html:not(.js) .scrollmap__point .card,
+html:not(.js) .scrollmap__point .card > * { opacity: 1; transform: none; }
+
+.scrollmap__point .card h2 {
+	font-family: "WWF", inherit;
+	font-weight: 400;
+	text-transform: uppercase;
+	font-size: 160%;
+	line-height: 1.2;
+	margin: 0.4em 0 0.3em;
+}
+.scrollmap__point .card p { margin: 0.5em 0; }
+.scrollmap__point .card a { color: #1155cc; text-decoration: underline; }
+.scrollmap__point .card a:hover { text-decoration: none; }
+
+.scrollmap__point .card figure { margin: 0.9em 0 0.4em; }
+.scrollmap__point .card figure img { width: 100%; height: auto; border-radius: 2px; }
+.scrollmap__point .card figcaption {
+	margin-top: 0.25em;
+	text-align: center;
+	opacity: 0.6;
+	font-size: 72%;
+	line-height: 1.4;
+}
+
+/* --- responsive ------------------------------------------------------------ */
+@media (min-width: 1100px) {
+	.scrollmap__point .card { padding: 24px 32px; }
+	.scrollmap__point .card h2 { font-size: 180%; }
+}
+@media (max-width: 899px) {
+	.scrollmap__point { padding-left: 16px; padding-right: 16px; }
+	.scrollmap__point .card,
+	.scrollmap__point[data-align="left"] .card,
+	.scrollmap__point[data-align="right"] .card { grid-column: 1 / span 10; }
+	.scrollmap__frame { outline-width: 3px; }
+}
+@media (max-width: 619px) {
+	.scrollmap__point .card,
+	.scrollmap__point[data-align="left"] .card,
+	.scrollmap__point[data-align="right"] .card { grid-column: 1 / -1; }
+	.scrollmap__point .card { padding: 16px 20px; }
+}
+
+/* --- motion safety ---------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+	.scrollmap__stage,
+	.scrollmap__frame,
+	.scrollmap__point .card,
+	.scrollmap__point .card > *,
+	.scrollmap__rail button { transition: none !important; }
+	.scrollmap__frame.is-arrive::after { animation: none; }
+	.scrollmap__point .card,
+	.scrollmap__point .card > * { opacity: 1; transform: none; }
+}

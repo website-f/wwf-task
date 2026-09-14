@@ -1,0 +1,34 @@
+# Local WordPress demo stack for the wwf/scrollmap block.
+#   docker compose up -d
+#   → http://localhost:8280  (finish the 2-minute WP install wizard)
+#   → wp-admin → Plugins → activate "WWF Scroll Map"
+#   → new Page → "+" → Scroll Map
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_ROOT_PASSWORD: root
+    volumes:
+      - db_data:/var/lib/mysql
+
+  wordpress:
+    image: wordpress:6.7-php8.3-apache
+    depends_on:
+      - db
+    ports:
+      - "8280:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+    volumes:
+      - wp_data:/var/www/html
+      - ./wwf-scrollmap:/var/www/html/wp-content/plugins/wwf-scrollmap
+
+volumes:
+  db_data:
+  wp_data:

@@ -29,6 +29,41 @@ Recreation of the 2nd webpart from
   http://localhost:8280/wp-admin (**admin / admin**) → Pages → "Tiger Range Countries".
   Editors draw the regions on the map, drag them to move, drag corners to resize.
 
+## Layout
+
+```
+src/core/        THE WEBPART. No CMS in it. Schema + styles + engine + JSON renderer.
+src/adapters/    one folder per CMS — each just maps that CMS onto the schema
+  headless/        runnable: an HTML page + content.json, no server template at all
+  drupal-twig/     Twig template + Paragraph field mapping
+  sharepoint-spfx/ web part class + property pane
+src/wp-plugin/   the fully-built adapter: a Gutenberg block with a visual hotspot editor
+src/standalone/  Task 1 demo — hand-written markup against the same core
+tools/           sync-core.js (core → adapters) · check-parity.js (do they all agree?)
+```
+
+Proof rather than assertion:
+
+```
+$ node tools/check-parity.js
+steps rendered   WordPress 8 · headless 8 · Node 8
+MATCH   WordPress vs headless
+MATCH   headless vs Node
+All three renderers agree. The content contract holds across CMSs.
+```
+
+## New to this code? Start here
+
+Two from-scratch explainers that assume nothing — every class, every style, every animation,
+and how a folder becomes a WordPress plugin:
+
+- **[docs/10-TASK1-EXPLAINED.md](docs/10-TASK1-EXPLAINED.md)** — the webpart: the film-crew
+  mental model, every class and its CSS, GSAP in ten minutes, what happens on one scroll,
+  the zoom maths
+- **[docs/11-TASK2-EXPLAINED.md](docs/11-TASK2-EXPLAINED.md)** — the plugin: what a plugin
+  *is*, what a block *is*, where the data is stored, `block.json` / `render.php` / `editor.js`
+  field by field, and the journey of one hotspot from mouse-drag to screen
+
 ## Read in this order
 
 1. [docs/00-PLAN.md](docs/00-PLAN.md) — master plan, stack + CMS decisions, milestones
@@ -38,6 +73,9 @@ Recreation of the 2nd webpart from
 5. **[docs/05-CODE-EXPLANATION.md](docs/05-CODE-EXPLANATION.md) — ⭐ the presentation master doc: every method explained, self code-review, demo runbook**
 6. **[docs/06-FILE-BY-FILE-REFERENCE.md](docs/06-FILE-BY-FILE-REFERENCE.md) — every file and every function in one table, plus the known-deviations list**
 7. **[docs/07-EDITOR-GUIDE.md](docs/07-EDITOR-GUIDE.md) — the non-technical editor's manual: add the block, draw regions, edit everything, publish**
+8. **[docs/08-ADD-TO-A-PAGE.md](docs/08-ADD-TO-A-PAGE.md) — click-by-click: new page → map on the page → published**
+9. **[docs/09-INSTALLING.md](docs/09-INSTALLING.md) — how the plugin gets onto an empty WordPress, and what "install" means in Drupal / SharePoint / headless**
+10. **[src/core/README.md](src/core/README.md) — how to put this webpart in *any* CMS** · [src/adapters/README.md](src/adapters/README.md) — what an adapter actually costs
 8. [docs/04-ASSETS-CHECKLIST.md](docs/04-ASSETS-CHECKLIST.md) — asset inventory + licensing note
 
 ## One-paragraph summary of the approach

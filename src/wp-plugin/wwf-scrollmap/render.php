@@ -3,78 +3,46 @@
  * Server render for the wwf/scrollmap block.
  *
  * Prints exactly the markup of the standalone Task 1 file, so style.css and
- * view.js are shared with it byte-for-byte. Every value is escaped, every
- * number re-clamped (never trust what is stored in post content), and card
- * HTML is whitelisted through wp_kses.
+ * view.js are shared with it byte-for-byte.
+ *
+ * The content model is the brief's, in the brief's words:
+ *     section title  →  the opening card's heading + the section's accessible name
+ *     lead text      →  the opening card's paragraphs
+ *     images         →  the map, plus one optional image per hotspot
+ *     hotspots[]     →  one card + one highlighted region each, in scroll order
+ *     closing text   →  an optional final card
+ *
+ * Everything is escaped, every number is re-clamped (post content is editable,
+ * so stored values are never trusted), and hotspot text goes through wp_kses.
  *
  * Available: $attributes (validated against block.json), $content, $block.
  */
 
 defined( 'ABSPATH' ) || exit;
 
-/**
- * Split a heading into masked lines for the reveal animation.
- *
- * Each line becomes <span class="w"><span>…</span></span>: the outer span
- * clips, the inner one is what GSAP slides up from underneath. Editors
- * control the line breaks by pressing Enter in the heading field — that is
- * the whole contract, and it keeps typography under editorial control.
- */
-function wwf_scrollmap_heading_lines( $heading ) {
-	$lines = preg_split( '/\R+/u', trim( (string) $heading ) );
-	$out   = '';
-	foreach ( $lines as $line ) {
-		$line = trim( $line );
-		if ( '' === $line ) {
-			continue;
-		}
-		$out .= '<span class="w"><span>' . esc_html( $line ) . '</span></span>';
-	}
-	return $out;
-}
-
-/** Clamp a hotspot to the image, matching the editor's clampBox() exactly. */
-function wwf_scrollmap_clamp_box( $box ) {
-	if ( ! is_array( $box ) ) {
-		return null;
-	}
-	$w = max( 2, min( 100, (float) ( $box['w'] ?? 10 ) ) );
-	$h = max( 2, min( 100, (float) ( $box['h'] ?? 10 ) ) );
-	return array(
-		'x' => round( max( 0, min( 100 - $w, (float) ( $box['x'] ?? 0 ) ) ), 2 ),
-		'y' => round( max( 0, min( 100 - $h, (float) ( $box['y'] ?? 0 ) ) ), 2 ),
-		'w' => round( $w, 2 ),
-		'h' => round( $h, 2 ),
-	);
-}
-
-/** #rrggbb → "r, g, b" so a hex picker can drive an rgba() custom property. */
-function wwf_scrollmap_rgb( $hex, $fallback = '0,0,0' ) {
-	$hex = sanitize_hex_color( $hex );
-	if ( ! $hex ) {
-		return $fallback;
-	}
-	$hex = ltrim( $hex, '#' );
-	if ( 3 === strlen( $hex ) ) {
-		$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
-	}
-	return hexdec( substr( $hex, 0, 2 ) ) . ', ' . hexdec( substr( $hex, 2, 2 ) ) . ', ' . hexdec( substr( $hex, 4, 2 ) );
-}
+/* The template helpers live in wwf-scrollmap.php, which WordPress loads once.
+   They cannot live here: a block render template is included once PER BLOCK
+   INSTANCE, and `supports.multiple` means a page may hold several — the second
+   include then fatals with "Cannot redeclare". */
 
 /* ---------------------------------------------------------------------- */
 
-$bg     = $attributes['backgroundImage'] ?? null;
-$points = $attributes['points'] ?? array();
+$bg       = $attributes['backgroundImage'] ?? null;
+$hotspots = $attributes['hotspots'] ?? array();
 
-/* Required field. Without a map there is nothing to render. */
+/* Required. Without a map there is nothing to render. */
 if ( empty( $bg['url'] ) ) {
 	if ( current_user_can( 'edit_posts' ) ) {
 		echo '<p style="padding:1em;background:#fcf0f1;border:1px solid #d63638">'
-			. esc_html__( 'Scroll Map: choose a background map image to render this block.', 'wwf-scrollmap' )
+			. esc_html__( 'Scroll Map: choose a map image to render this block.', 'wwf-scrollmap' )
 			. '</p>';
 	}
 	return;
 }
+
+$section_title = trim( (string) ( $attributes['sectionTitle'] ?? '' ) );
+$lead_text     = trim( (string) ( $attributes['leadText'] ?? '' ) );
+$closing_text  = trim( (string) ( $attributes['closingText'] ?? '' ) );
 
 $focal_x  = max( 0, min( 100, (float) ( $attributes['focalX'] ?? 0 ) ) );
 $focal_y  = max( 0, min( 100, (float) ( $attributes['focalY'] ?? 50 ) ) );
@@ -98,7 +66,7 @@ $style_vars = sprintf(
 	esc_attr( $card_op )
 );
 
-/* Card body: harmless inline markup only. This whitelist is mirrored by the
+/* Hotspot text: harmless inline markup only. This whitelist is mirrored by the
    editor's RichText allowedFormats, so what an editor can type and what the
    server will print can never drift apart. */
 $allowed_html = array(
@@ -114,8 +82,6 @@ $allowed_html = array(
 	),
 );
 
-$section_title = trim( (string) ( $attributes['sectionTitle'] ?? '' ) );
-
 $wrapper_attributes = get_block_wrapper_attributes(
 	array(
 		'class' => 'tgr',
@@ -129,13 +95,7 @@ $wrapper_attributes = get_block_wrapper_attributes(
 	data-paws="<?php echo empty( $attributes['showPaws'] ) ? 'off' : 'on'; ?>"
 	data-markers="<?php echo empty( $attributes['showMarkers'] ) ? 'off' : 'on'; ?>"
 	data-rail="<?php echo empty( $attributes['showRail'] ) ? 'off' : 'on'; ?>"
-	<?php if ( $section_title ) : ?>aria-label="<?php echo esc_attr( $section_title ); ?>"<?php endif; ?>>
-
-	<?php if ( $section_title ) : ?>
-		<?php /* The visible title is part of the map artwork; this keeps the
-		         section in the document outline for assistive tech and SEO. */ ?>
-		<h2 class="tgr__sr"><?php echo esc_html( $section_title ); ?></h2>
-	<?php endif; ?>
+	<?php if ( $section_title ) : ?>aria-label="<?php echo esc_attr( wp_strip_all_tags( $section_title ) ); ?>"<?php endif; ?>>
 
 	<div class="tgr__stage">
 		<div class="tgr__camera">
@@ -175,99 +135,83 @@ $wrapper_attributes = get_block_wrapper_attributes(
 	</div>
 
 	<div class="tgr__steps">
-		<?php foreach ( $points as $index => $point ) : ?>
-			<?php
-			$side    = ( ( $point['side'] ?? '' ) === 'left' ) ? 'left' : 'right';
-			$wide    = ! empty( $point['wide'] );
-			$label   = trim( (string) ( $point['label'] ?? '' ) );
-			$zoom    = max( 0.4, min( 2.5, (float) ( $point['zoom'] ?? 1 ) ) );
-			$hotspot = $wide ? null : wwf_scrollmap_clamp_box( $point['hotspot'] ?? null );
-			$heading = (string) ( $point['heading'] ?? '' );
-			$status  = trim( (string) ( $point['status'] ?? '' ) );
-			$level   = in_array( $point['statusLevel'] ?? '', array( 'endangered', 'vulnerable', 'least' ), true )
-				? $point['statusLevel'] : '';
-			$number  = trim( (string) ( $point['number'] ?? '' ) );
-			$img     = $point['image'] ?? null;
-			?>
-			<article class="step<?php echo $wide ? ' step--wide' : ''; ?>"
-				data-side="<?php echo esc_attr( $side ); ?>"
-				data-zoom="<?php echo esc_attr( $zoom ); ?>"
-				<?php if ( $label ) : ?>data-label="<?php echo esc_attr( $label ); ?>"<?php endif; ?>
-				<?php if ( $hotspot ) : ?>data-hotspot="<?php echo esc_attr( wp_json_encode( $hotspot ) ); ?>"<?php endif; ?>>
-				<?php /* .step__pin is sticky: the card holds at a fixed spot on screen
-				         while the camera flies, so exactly one card is ever visible. */ ?>
-				<div class="step__pin">
-				<div class="card">
 
-					<?php if ( $wide ) : ?>
-						<?php if ( $label ) : ?>
-							<span class="eyebrow"><?php echo esc_html( $label ); ?></span>
-						<?php endif; ?>
-						<?php if ( '' !== trim( $heading ) ) : ?>
-							<p class="h2 title"><?php echo wwf_scrollmap_heading_lines( $heading ); // phpcs:ignore WordPress.Security.EscapeOutput ?></p>
-						<?php endif; ?>
-					<?php else : ?>
-						<?php if ( $number || $label ) : ?>
-							<div class="card__meta">
-								<?php if ( $number ) : ?><span class="card__num"><?php echo esc_html( $number ); ?></span><?php endif; ?>
-								<?php if ( $label ) : ?><span class="card__region"><?php echo esc_html( $label ); ?></span><?php endif; ?>
-							</div>
-						<?php endif; ?>
-						<?php if ( '' !== trim( $heading ) ) : ?>
-							<p class="h2"><?php echo wwf_scrollmap_heading_lines( $heading ); // phpcs:ignore WordPress.Security.EscapeOutput ?></p>
-						<?php endif; ?>
-						<?php if ( $status ) : ?>
-							<span class="card__status"<?php echo $level ? ' data-level="' . esc_attr( $level ) . '"' : ''; ?>><?php echo esc_html( $status ); ?></span>
-						<?php endif; ?>
-					<?php endif; ?>
+		<?php
+		/* ---- the opening card: section title + lead text ---------------- */
+		if ( $section_title || $lead_text ) {
+			$inner = '';
+			if ( $section_title ) {
+				$inner .= '<h2 class="h2 title">' . wwf_scrollmap_title_lines( $section_title ) . '</h2>';
+			}
+			$inner .= wwf_scrollmap_paragraphs( $lead_text, 'lede' );
+			wwf_scrollmap_step(
+				'step step--wide',
+				'right',
+				wp_strip_all_tags( str_replace( "\n", ' ', $section_title ) ),
+				$inner
+			);
+		}
 
-					<?php
-					if ( ! empty( $point['body'] ) ) {
-						$body = wp_kses( $point['body'], $allowed_html );
-						if ( $wide ) {
-							/* the opening/closing cards use the larger lede size */
-							$body = str_replace( '<p>', '<p class="lede">', $body );
-						}
-						echo $body; // phpcs:ignore WordPress.Security.EscapeOutput — kses'd above
-					}
-					?>
+		/* ---- one card per hotspot, in order ----------------------------- */
+		foreach ( $hotspots as $index => $hs ) {
+			$box = wwf_scrollmap_clamp_box( $hs['box'] ?? null );
+			if ( ! $box ) {
+				continue;   /* a hotspot without a region has nothing to fly to */
+			}
 
-					<?php if ( ! empty( $img['id'] ) || ! empty( $img['url'] ) ) : ?>
-						<figure>
-							<div class="card__shot">
-								<?php
-								if ( ! empty( $img['id'] ) ) {
-									echo wp_get_attachment_image(
-										(int) $img['id'],
-										'large',
-										false,
-										array( 'loading' => 'lazy', 'decoding' => 'async' )
-									);
-								} else {
-									printf(
-										'<img src="%s" alt="%s" loading="lazy">',
-										esc_url( $img['url'] ),
-										esc_attr( $img['alt'] ?? '' )
-									);
-								}
-								?>
-							</div>
-							<?php if ( ! empty( $point['caption'] ) ) : ?>
-								<figcaption><?php echo esc_html( $point['caption'] ); ?></figcaption>
-							<?php endif; ?>
-						</figure>
-					<?php endif; ?>
+			$label  = trim( (string) ( $hs['label'] ?? '' ) );
+			$title  = (string) ( $hs['title'] ?? '' );
+			$badge  = trim( (string) ( $hs['badge'] ?? '' ) );
+			$level  = in_array( $hs['badgeLevel'] ?? '', array( 'endangered', 'vulnerable', 'least' ), true )
+				? $hs['badgeLevel'] : '';
+			$side   = ( ( $hs['side'] ?? '' ) === 'left' ) ? 'left' : 'right';
+			$zoom   = max( 0.4, min( 2.5, (float) ( $hs['zoom'] ?? 1 ) ) );
+			$img    = $hs['image'] ?? null;
 
-				</div>
-				</div>
-			</article>
-		<?php endforeach; ?>
+			/* Numbering follows the order, so reordering renumbers for free and
+			   there is one less field for an editor to keep in sync. */
+			$number = str_pad( (string) ( $index + 1 ), 2, '0', STR_PAD_LEFT );
+
+			$inner = '<div class="card__meta"><span class="card__num">' . esc_html( $number ) . '</span>';
+			if ( $label ) {
+				$inner .= '<span class="card__region">' . esc_html( $label ) . '</span>';
+			}
+			$inner .= '</div>';
+
+			if ( '' !== trim( $title ) ) {
+				$inner .= '<p class="h2">' . wwf_scrollmap_title_lines( $title ) . '</p>';
+			}
+			if ( $badge ) {
+				$inner .= '<span class="card__status"' . ( $level ? ' data-level="' . esc_attr( $level ) . '"' : '' )
+					. '>' . esc_html( $badge ) . '</span>';
+			}
+			if ( ! empty( $hs['text'] ) ) {
+				$inner .= wp_kses( $hs['text'], $allowed_html );
+			}
+			if ( ! empty( $img['id'] ) || ! empty( $img['url'] ) ) {
+				$shot = ! empty( $img['id'] )
+					? wp_get_attachment_image( (int) $img['id'], 'large', false, array( 'loading' => 'lazy', 'decoding' => 'async' ) )
+					: sprintf( '<img src="%s" alt="%s" loading="lazy">', esc_url( $img['url'] ), esc_attr( $img['alt'] ?? '' ) );
+				$inner .= '<figure><div class="card__shot">' . $shot . '</div>';
+				if ( ! empty( $hs['caption'] ) ) {
+					$inner .= '<figcaption>' . esc_html( $hs['caption'] ) . '</figcaption>';
+				}
+				$inner .= '</figure>';
+			}
+
+			wwf_scrollmap_step( 'step', $side, $label, $inner, $zoom, $box );
+		}
+
+		/* ---- the optional closing card ---------------------------------- */
+		if ( $closing_text ) {
+			wwf_scrollmap_step(
+				'step step--wide',
+				'left',
+				__( 'In closing', 'wwf-scrollmap' ),
+				wwf_scrollmap_paragraphs( $closing_text, 'lede' )
+			);
+		}
+		?>
+
 	</div>
-
-	<?php
-	/* Optional accessible alternative for data baked into the map artwork. */
-	if ( ! empty( $attributes['dataTable'] ) ) {
-		echo '<div class="tgr__sr">' . wp_kses_post( $attributes['dataTable'] ) . '</div>';
-	}
-	?>
 </section>

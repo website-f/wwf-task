@@ -1,0 +1,161 @@
+{
+  "sectionTitle": "What do\ntigers eat?",
+  "leadText": "We talk a lot about tiger prey — but what animals do tigers actually eat?\nThe most important tiger prey are ungulates: mammals with hooves, such as large deer, wild cattle and wild pigs. Scroll on to travel to some of the places where tiger prey are found.",
+  "closingText": "These are just a few of the many tiger prey species. Other important ungulates across the tiger's range include gaur, roe deer, sika deer, hog deer, muntjac, barasingha and eld's deer.",
+  "map": {
+    "src": "../../standalone/assets/map.jpg",
+    "alt": "Illustrated map of Asia titled Tiger Range Countries, showing each country's wild tiger population and population trend.",
+    "width": 2561,
+    "height": 1224
+  },
+  "hotspots": [
+    {
+      "id": "sambar",
+      "label": "India & Nepal",
+      "title": "Sambar\ndeer",
+      "side": "right",
+      "badge": "IUCN · Vulnerable",
+      "badgeLevel": "vulnerable",
+      "box": {
+        "x": 48.5,
+        "y": 43,
+        "w": 17.1,
+        "h": 39.3
+      },
+      "text": "<p>Sambar deer are one of the most important tiger prey species. They are often abundant in tiger reserves in India and Nepal. They can also be found across Southeast Asia, but are much rarer there due to hunting.</p>",
+      "image": {
+        "src": "../../standalone/assets/sambar.jpg",
+        "alt": "A sambar deer foal resting its head against its mother in dry grassland.",
+        "width": 1400,
+        "height": 890
+      },
+      "caption": "Sambar foal and its mother in Ranthambore Tiger Reserve, India © Martin Harvey / WWF"
+    },
+    {
+      "id": "wildpig",
+      "label": "Sumatra, Indonesia",
+      "title": "Wild pig",
+      "side": "left",
+      "badge": "IUCN · Least concern",
+      "badgeLevel": "least",
+      "box": {
+        "x": 66.5,
+        "y": 79.4,
+        "w": 20,
+        "h": 20.6
+      },
+      "text": "<p>Wild pigs are the most widely distributed tiger prey species, occurring in every landscape in which tigers are found. On Sumatra they are one of the most important prey species of all. A female can have up to two litters a year, of four to eight piglets each.</p>",
+      "image": {
+        "src": "../../standalone/assets/wildpig.jpg",
+        "alt": "A wild boar and three striped piglets walking across bare forest floor.",
+        "width": 1400,
+        "height": 933
+      },
+      "caption": "Wild boar have brown fur that provides excellent camouflage in the forest © Ola Jennersten / WWF-Sweden"
+    },
+    {
+      "id": "banteng",
+      "label": "Thailand",
+      "title": "Banteng",
+      "side": "right",
+      "badge": "IUCN · Endangered",
+      "badgeLevel": "endangered",
+      "box": {
+        "x": 66.2,
+        "y": 55.5,
+        "w": 14,
+        "h": 18.3
+      },
+      "text": "<p>One of the largest tiger prey species: banteng are wild cattle, classified as Endangered. Historic hunting and a current snaring crisis across Southeast Asia have driven their populations down — but in Thailand there are signs of hope.</p><p>A <a href=\"https://www.sciencedirect.com/science/article/pii/S2351989424002166\">recently published paper</a> showed banteng in Huai Kha Khaeng have doubled in 15 years, on the back of strong law enforcement and long-term investment in protecting a source tiger site.</p>",
+      "image": {
+        "src": "../../standalone/assets/banteng.jpg",
+        "alt": "A male banteng, a large dark wild ox with white stockings, in a forest clearing.",
+        "width": 1200,
+        "height": 803
+      },
+      "caption": "A male banteng in Kuiburi National Park, Thailand © Wayuphong Jitvijak / WWF-Greater Mekong"
+    },
+    {
+      "id": "bukhara",
+      "label": "Kazakhstan",
+      "title": "Bukhara\ndeer",
+      "side": "left",
+      "badge": "Central Asian red deer",
+      "box": {
+        "x": 52,
+        "y": 16,
+        "w": 15.5,
+        "h": 20
+      },
+      "text": "<p>In Central Asia a different set of species matters. Bukhara deer — the Central Asian subspecies of red deer — are increasing thanks to conservation work. Restoring healthy numbers is key to a landmark reintroduction: tigers went extinct in Kazakhstan over 70 years ago, and are planned to return within a few years.</p>",
+      "image": {
+        "src": "../../standalone/assets/bukhara.jpg",
+        "alt": "A herd of bukhara deer moving across dry open plain after release.",
+        "width": 1400,
+        "height": 841
+      },
+      "caption": "Newly released bukhara deer, Kazakhstan © WWF"
+    },
+    {
+      "id": "nilgai",
+      "label": "India",
+      "title": "Nilgai",
+      "side": "right",
+      "badge": "IUCN · Least concern",
+      "badgeLevel": "least",
+      "box": {
+        "x": 46.2,
+        "y": 42,
+        "w": 17.7,
+        "h": 33.9
+      },
+      "text": "<p>Nilgai are the largest antelope in Asia. Thin legs, a large torso, a wide neck and a small head make them unmistakable. Found mostly in India and parts of Nepal, they weigh roughly 100–288 kg depending on sex.</p>",
+      "image": {
+        "src": "../../standalone/assets/nilgai.jpg",
+        "alt": "A nilgai antelope standing alert in golden grassland.",
+        "width": 1400,
+        "height": 933
+      },
+      "caption": "Nilgai in Ranthambore Tiger Reserve, India © Ola Jennersten / WWF-Sweden"
+    },
+    {
+      "id": "chital",
+      "label": "Nepal & India",
+      "title": "Chital",
+      "side": "left",
+      "badge": "IUCN · Least concern",
+      "badgeLevel": "least",
+      "box": {
+        "x": 56.4,
+        "y": 40.7,
+        "w": 11.4,
+        "h": 14.8
+      },
+      "text": "<p>Also known as spotted deer, chital are an important and abundant prey species for tigers in India and Nepal. They are also found in Bangladesh and Bhutan.</p>",
+      "image": {
+        "src": "../../standalone/assets/chital.jpg",
+        "alt": "A chital, or spotted deer, caught on a night-time camera trap.",
+        "width": 1400,
+        "height": 1078
+      },
+      "caption": "Chital on a camera trap in the Khata Corridor, Nepal © DoFSC / WWF Nepal"
+    }
+  ],
+  "options": {
+    "focal": {
+      "x": 0,
+      "y": 50
+    },
+    "paws": true,
+    "markers": true,
+    "rail": true,
+    "theme": {
+      "accent": "#8fd14f",
+      "ink": "#f2efe6",
+      "backdrop": "#04140d",
+      "card": "#071a11",
+      "dim": 0.62,
+      "cardOpacity": 0.84
+    }
+  }
+}

@@ -17,40 +17,45 @@ Media Library attachment IDs (not URLs) so renditions/alt come from the library.
 
 ```jsonc
 {
-  // ---- the map --------------------------------------------------------
-  "sectionTitle": "Tiger range countries",      // REQUIRED, screen-reader <h2> + aria-label
-  "backgroundImage": { "id": 4, "url": "…", "alt": "…" },  // REQUIRED, media-library ID
-  "focalX": 0, "focalY": 50,                    // % — which part survives the cover crop
+  // ── the fields the brief names, and nothing else at this level ─────────
+  "sectionTitle": "What do\ntigers eat?",   // REQUIRED — big heading on the
+                                            // opening card + the accessible name.
+                                            // Newlines are the reveal's line breaks.
+  "leadText":     "We talk a lot about…",    // the introduction. One paragraph per line.
+  "closingText":  "These are just a few…",   // optional final card
+  "backgroundImage": { "id": 4, "url": "…", "alt": "…" },   // REQUIRED — the map
 
-  // ---- motion (editor switches) ---------------------------------------
-  "showPaws": true, "showMarkers": true, "showRail": true,
-
-  // ---- design tokens --------------------------------------------------
-  "accentColor": "#8fd14f", "inkColor": "#f2efe6",
-  "backdropColor": "#04140d", "cardColor": "#071a11",
-  "dimOpacity": 0.62, "cardOpacity": 0.84,
-
-  // ---- the story: ordered, order == scroll order -----------------------
-  "points": [
+  "hotspots": [                              // ordered; order == scroll order
     {
-      "id": "pt-sambar",          // stable key: survives reordering
-      "wide": false,              // true = wide establishing shot, no region
-      "side": "right",            // which half the CARD occupies; region flies to the other
-      "label": "India & Nepal",   // region badge + chapter rail
-      "number": "01",
-      "heading": "Sambar\ndeer",  // newlines = masked reveal lines
-      "status": "IUCN · Vulnerable",
-      "statusLevel": "vulnerable",// '' | least | vulnerable | endangered → chip colour
-      "body": "<p>…</p>",         // RichText, kses-limited to p/br/em/strong/u/a
+      "id": "hs-sambar",        // stable key, survives reordering
+      "label": "India & Nepal", // shown on the badge over the map + the jump bar
+      "title": "Sambar\ndeer",  // the card's heading
+      "text":  "<p>…</p>",      // RichText, kses-limited to p/br/em/strong/u/a
       "image": { "id": 5, "url": "…", "alt": "…" },
       "caption": "… © Martin Harvey / WWF",
-      "zoom": 1,                  // how hard the camera pushes in
-      "hotspot": { "x": 48.5, "y": 43, "w": 17.1, "h": 39.3 }   // % of the image, or null
+      "side": "right",          // which half the TEXT occupies; the map zooms
+                                // to the other half — see freeArea()
+      "box": { "x": 48.5, "y": 43, "w": 17.1, "h": 39.3 },  // % of the image
+      "badge": "IUCN · Vulnerable",   // advanced
+      "badgeLevel": "vulnerable",     // advanced — '' | least | vulnerable | endangered
+      "zoom": 1                       // advanced
     }
-    // …more chapters
-  ]
+  ],
+
+  // ── advanced: one collapsed panel in the editor, all optional ──────────
+  "focalX": 0, "focalY": 50,
+  "showPaws": true, "showMarkers": true, "showRail": true,
+  "accentColor": "#8fd14f", "inkColor": "#f2efe6",
+  "backdropColor": "#04140d", "cardColor": "#071a11",
+  "dimOpacity": 0.62, "cardOpacity": 0.84
 }
 ```
+
+**Two deliberate simplifications.** There is no "card type" switch — the opening
+and closing cards are just the `sectionTitle`/`leadText`/`closingText` fields, so
+an editor never has to understand a mode. And hotspots carry no number field:
+numbering is derived from position, so reordering renumbers for free and there
+is one less thing to keep in sync.
 
 Design decisions to defend:
 - **% coordinates, not pixels** → resolution-independent; the same data renders on any
@@ -60,23 +65,26 @@ Design decisions to defend:
   across many pages — mention as a variation ("Reusable block / pattern" already covers it).
 - **IDs on points** → stable reordering, no key collisions.
 
-### 1a. What is built vs what is planned
+### 1a. The brief's four bullets, mapped to what an editor clicks
 
-Everything in the model above is implemented and running at `localhost:8280`. Two things in
-this plan are deliberately *not* built, and I would rather name them than let them be found:
+| The brief says | Where it is | Verified |
+|---|---|---|
+| **Add the webpart to any page via the page editor** | `+` inserter → **Scroll Map**. `supports.multiple` allows several per page | two instances on one page render and boot independently, assets enqueued once each |
+| **Enter/configure the required data fields** — section title, images, hotspots, lead text | Sidebar **1 · Section** (section title, lead text, closing text) and **2 · Map image**. Each hotspot's title and text are typed straight into the card preview under the map | — |
+| **Edit / Reorder / Remove hotspots** | Sidebar **3 · Hotspots**: ↑ ↓ reorder, ⧉ duplicate, 🗑 remove, **+ Add hotspot**. The region is **drawn on the map** — drag to create, drag the middle to move, drag a corner to resize | scripted: reorder swapped rows, add → 7, remove → 6, drag moved a box 56.4%→62.3% |
+| **Preview before publishing** | The canvas is live; the **Before you publish** panel turns green and points at WordPress's Preview (desktop / tablet / mobile toggles, and Preview in a new tab renders the draft) | — |
 
-| Plan item | Status |
+Everything that is *not* on that list — map framing, motion switches, colours,
+per-hotspot zoom and numeric coordinates — is in one collapsed **Advanced**
+panel, so the default sidebar is four panels and a status box.
+
+Two things in this plan are deliberately **not** built, and I would rather name
+them than have them found:
+
+| Not built | Why |
 |---|---|
-| Every attribute above, incl. focal point, the three motion switches and four colours | ✅ built (`block.json`) |
-| Draw / move / resize a region on the map; numeric fields in sync; clamped on both sides | ✅ built (`editor.js`, verified with scripted mouse events) |
-| Chapters: add (map or text), reorder, duplicate, remove | ✅ built — **↑ ↓ buttons**, not a drag handle |
-| Validation: hard rules lock Publish with reasons; soft a11y warnings never block | ✅ built |
-| Live card preview with inline heading / status / rich body | ✅ built |
-| Layout guide showing where region and card will land | ✅ built |
-| Preview before publish | ✅ native WordPress draft preview + device toggles |
-| Server render sharing the Task 1 markup, stylesheet and engine | ✅ built |
-| Separate portrait `mobileImage` | ⛔ not built — the phone layout flies the one map inside a 45vh window instead, so editors enter content once. A `mobileImage` field is the refinement if art direction ever demands it |
-| Drag-handle reordering | ⛔ not built — ↑↓ is keyboard- and screen-reader-accessible with no extra work; drag-and-drop is not |
+| Separate portrait `mobileImage` | the phone layout flies the one map inside a 45vh window, so editors enter content once |
+| Drag-handle reordering | ↑↓ is keyboard- and screen-reader-accessible with no extra work; drag-and-drop is not |
 
 ## 2. Editor experience (what the editor sees)
 
@@ -96,41 +104,35 @@ keywords (`map`, `scrollytelling`, `hotspot`) registered in `block.json`.
 
 ### Sidebar (InspectorControls)
 ```
-▸ Fix before publishing            ← only appears when something is blocking
-▸ Accessibility                    ← soft warnings (missing alt text)
-▸ Map
-   [map thumbnail]  [Replace map image]
-   Section title  [__________________]   (required)
-   Framing — horizontal  ──●────  0      (0 = keep the left edge)
-   Framing — vertical    ────●──  50
-▸ Motion
-   [x] Paw-print trail between chapters
-   [x] Numbered pins on the map
-   [x] Chapter rail along the bottom
-▸ Colours
-   Accent / Text / Backdrop / Card  (brand palette + custom)
-   Dim outside the region  ─────●──
-   Card opacity            ──────●─
-▸ Chapters (8)
-   ┌────────────────────────────────────┐
-   │ ① What do tigers eat?  TEXT ↑↓⧉🗑 │  click a row → selects it
-   │ ② Sambar deer          MAP  ↑↓⧉🗑 │  red outline = missing text
-   │ …                                  │
-   └────────────────────────────────────┘
-   [+ Map chapter] [+ Text chapter]
-▸ Chapter 2
-   Chapter type  (Map chapter ▾)
-   Card side     (Card right · map left ▾)
-   Region label  [India & Nepal]     Number [01]
-   Status chip colour (Vulnerable ▾)
-   [Add photo]  Caption [__________]
-   ── [Draw the region on the map] ──
-   Zoom strength ────●──
-   X 48.5   Y 43     W 17.1   H 39.3
+▸ Before you publish
+    ✔ Ready. Use Preview in the top bar…        ← or a numbered "Still to do" list
+▸ 1 · Section
+    Section title  [What do / tigers eat?]      (required)
+    Lead text      [………]                        one paragraph per line
+    Closing text   [………]                        optional
+▸ 2 · Map image
+    [thumbnail]  [Replace map image]
+▸ 3 · Hotspots (6)
+   ┌──────────────────────────────────┐
+   │ 01  Sambar deer      ↑ ↓ ⧉ 🗑   │   click a row to select it
+   │ 02  Wild pig         ↑ ↓ ⧉ 🗑   │   red outline = missing text
+   │ …                                │
+   └──────────────────────────────────┘
+    [ + Add hotspot ]
+▸ Hotspot 01
+    Location label [India & Nepal]
+    Which side is the text on?  (Text right · map left ▾)
+    [Add an image]   Caption [………]
+    [ Redraw this hotspot on the map ]
+▸ Advanced                                       ← collapsed
+    badge text/colour · zoom · X/Y/W/H · framing · motion · colours
 ```
 
+And on the canvas itself, a four-step progress strip that ticks itself off:
+`① Map image  ② Title & lead text  ③ Hotspots  ④ Preview, then publish`.
+
 ### Edit / Reorder / Remove hotspots — explicitly required by the brief
-- **Add**: `+ Add point` appends with sensible defaults (center, no hotspot).
+- **Add**: `+ Add hotspot` appends one and drops straight into draw mode.
 - **Edit**: select row → edit fields / redraw box on canvas.
 - **Reorder**: up/down buttons (immutable array swap on the attribute). A drag handle is
   the obvious next step; ↑↓ was chosen because it is keyboard- and screen-reader-accessible
@@ -207,14 +209,63 @@ soft rules only warn.
 - Content is plain JSON → exportable/migratable (WXR export carries it; a small
   script can transform it to any other CMS schema).
 
-## 7. Portability slide (if asked "but we use X")
+## 7. Portability — built, not promised
 
-| CMS | Same architecture maps to |
-|---|---|
-| SharePoint | SPFx web part; property pane = sidebar; web part properties = attributes JSON; React canvas identical |
-| Drupal | Paragraph type "Scroll map" + nested "Point" paragraphs; Twig template = render.php |
-| Umbraco | Block List editor + content models; Razor partial renders |
-| Headless (Contentful/Strapi/Sanity) | Component + repeatable "Point" entries; front end consumes JSON — our standalone JS engine is already framework-free |
+The webpart is **`src/core/`**: a JSON schema, a stylesheet, an engine, and a renderer. There
+is no CMS anywhere in it. Everything else in `src/` is an adapter whose only job is to map
+that CMS's storage onto [the schema](../src/core/scrollmap.schema.json).
+
+There are exactly two ways to integrate, and the choice is one question — *can your CMS render
+a server-side template?*
+
+| | Server-render | JSON-render |
+|---|---|---|
+| For | WordPress, Drupal, Umbraco, Sitecore, Craft, Rails | headless (Contentful/Strapi/Sanity), SPAs, SharePoint SPFx |
+| You write | a template that emits the markup | **nothing** |
+| How | your template ↔ `render.php` / `scrollmap.html.twig` | `<div data-tgr-src="#json">` + two script tags |
+| Best for | SEO, first paint | speed of integration |
+
+`scrollmap-render.js` is the same file in both cases — it runs in Node (so Eleventy, Astro,
+Next or a build step can pre-render) and in the browser (so a headless CMS needs no template).
+
+### What exists today
+
+| Adapter | Renders | State |
+|---|---|---|
+| WordPress (Gutenberg block) | server, PHP | **built and running** — full visual editor, validation, seeder |
+| Headless / any JSON API | browser | **built and running** — `src/adapters/headless/`, open `index.html` |
+| Drupal (Paragraphs + Twig) | server, Twig | template + field mapping + preprocess written, parity-checked |
+| SharePoint (SPFx web part) | browser | web part class + property pane written |
+
+### The claim is tested, not asserted
+
+`tools/check-parity.js` renders the **same content** three ways — WordPress's PHP, the browser,
+and Node — then compares hotspot coordinates, card order, headings, sides and numbering:
+
+```
+steps rendered   WordPress 8 · headless 8 · Node 8
+MATCH   WordPress vs headless
+MATCH   headless vs Node
+```
+
+`tools/sync-core.js --check` additionally fails the build if an adapter's copy of the core has
+drifted from `src/core/`. Both belong in CI.
+
+### What an adapter actually costs
+
+The two that exist end-to-end are the honest measure:
+
+| | WordPress | Headless |
+|---|---|---|
+| Rendering | `render.php`, ~200 lines | **0** |
+| Editing UI | `editor.js`, ~650 lines | the CMS's own field editor |
+| Content model | `block.json` attributes | the CMS's content type |
+| Engine / styles | copied, unmodified | copied, unmodified |
+
+🗣 **"The editing experience is the work; the webpart is not."** Any CMS with a repeater field
+can store hotspots today. What each one needs building is the part that makes it *pleasant* —
+drawing the box on the map instead of typing four numbers — and that canvas is ~120 lines of
+plain DOM code with no WordPress in it, so it ports too.
 
 ## 8. Technical steps to implement (WP demo)
 

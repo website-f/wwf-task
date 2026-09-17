@@ -11,12 +11,14 @@
   TASK 1 — "Tiger Range Countries" scroll-map webpart
   Reference: https://wwftigers.shorthandstories.com/tiger-prey-why-theyre-crucial-to-ecosystems-across-asia/
 
-  THREE FILES, and two of them are shared byte-for-byte with the CMS block:
-    scrollmap.css  ==  wp-plugin/wwf-scrollmap/style.css
-    scrollmap.js   ==  wp-plugin/wwf-scrollmap/view.js
-    index.html     ==  what wp-plugin/wwf-scrollmap/render.php prints
-  That is the architecture in one line: this file was written to be CMS
-  output, so nothing had to change when it became a block.
+  This file is a DEMO of the webpart, not the webpart. The webpart itself is
+  src/core/ — a stylesheet, an engine and a JSON contract, with no CMS in it
+  anywhere. This page just hand-writes the markup the contract describes.
+    ../core/scrollmap.css   the styles
+    ../core/scrollmap.js    the engine (also renders itself from JSON)
+    ../core/scrollmap.schema.json   the content contract
+  WordPress, Drupal, SharePoint and headless adapters all feed that same core;
+  see src/adapters/ and src/core/README.md.
 
   DEPENDENCY: GSAP 3.13 + ScrollTrigger, vendored locally (~115KB) so the demo
   runs offline. Justification in docs/00-PLAN.md §2 — short version: the hard
@@ -35,7 +37,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="scrollmap.css">
+<link rel="stylesheet" href="../core/scrollmap.css">
 
 <style>
   /* Demo scaffolding only — NOT part of the webpart. In the CMS the theme
@@ -286,8 +288,8 @@
   <p>Task&nbsp;2 — the same component as an editable WordPress block: <code>src/wp-plugin</code></p>
 </footer>
 
-<script src="vendor/gsap.min.js"></script>
-<script src="vendor/ScrollTrigger.min.js"></script>
-<script src="scrollmap.js"></script>
+<script src="../core/vendor/gsap.min.js"></script>
+<script src="../core/vendor/ScrollTrigger.min.js"></script>
+<script src="../core/scrollmap.js"></script>
 </body>
 </html>

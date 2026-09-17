@@ -1,0 +1,40 @@
+# A second, COMPLETELY EMPTY WordPress on :8281.
+#
+# Nothing is bind-mounted into it — no plugin folder, no source. It exists to
+# prove the one thing a demo on the dev stack cannot: that
+# dist/wwf-scrollmap-<version>.zip installs on a WordPress that has never seen
+# this code, the way a real site would install it.
+#
+#   docker compose -f docker-compose.clean.yml up -d
+#   → http://localhost:8281   run the 5-minute install, then
+#     Plugins → Add New Plugin → Upload Plugin → the zip → Activate
+#
+# Tear down with:  docker compose -f docker-compose.clean.yml down -v
+services:
+  cleandb:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_ROOT_PASSWORD: root
+    volumes:
+      - clean_db:/var/lib/mysql
+
+  cleanwp:
+    image: wordpress:6.7-php8.3-apache
+    depends_on:
+      - cleandb
+    ports:
+      - "8281:80"
+    environment:
+      WORDPRESS_DB_HOST: cleandb
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+    volumes:
+      - clean_wp:/var/www/html          # note: no ./wwf-scrollmap mount
+
+volumes:
+  clean_db:
+  clean_wp:

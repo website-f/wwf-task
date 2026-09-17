@@ -73,85 +73,68 @@ foreach ( $images as $key => $def ) {
 }
 
 /* ---------------------------------------------------------------------
-   The chapters. Hotspots are the ORIGINAL story's own coordinates, read
-   out of its DOM — percentages of the map image, so they are independent
-   of viewport size and of which image rendition gets served.
+   The content, in exactly the shape the brief asks for: a section title,
+   lead text, one map image, and an ordered list of hotspots. The hotspot
+   boxes are the ORIGINAL story's own coordinates, read out of its DOM —
+   percentages of the map image, so they are independent of viewport size
+   and of which image rendition gets served.
    ------------------------------------------------------------------ */
-$points = array(
+$hotspots = array(
 	array(
-		'id' => 'pt-intro', 'wide' => true, 'side' => 'right',
-		'label' => 'Tiger range countries',
-		'heading' => "What do\ntigers eat?",
-		'body' => '<p>We talk a lot about <em>tiger prey</em> — but what animals do tigers actually eat?</p><p>The most important tiger prey are ungulates: mammals with hooves, such as large deer, wild cattle and wild pigs. Scroll on to travel to some of the places where tiger prey are found.</p>',
-		'image' => null, 'caption' => '', 'hotspot' => null, 'zoom' => 1,
-		'number' => '', 'status' => '', 'statusLevel' => '',
-	),
-	array(
-		'id' => 'pt-sambar', 'wide' => false, 'side' => 'right',
-		'number' => '01', 'label' => 'India & Nepal', 'heading' => "Sambar\ndeer",
-		'status' => 'IUCN · Vulnerable', 'statusLevel' => 'vulnerable',
-		'hotspot' => array( 'x' => 48.5, 'y' => 43, 'w' => 17.1, 'h' => 39.3 ), 'zoom' => 1,
-		'body' => '<p>Sambar deer are one of the most important tiger prey species. They are often abundant in tiger reserves in India and Nepal. They can also be found across Southeast Asia, but are much rarer there due to hunting.</p>',
+		'id' => 'hs-sambar', 'side' => 'right', 'label' => 'India & Nepal',
+		'title' => "Sambar\ndeer", 'badge' => 'IUCN · Vulnerable', 'badgeLevel' => 'vulnerable',
+		'box' => array( 'x' => 48.5, 'y' => 43, 'w' => 17.1, 'h' => 39.3 ), 'zoom' => 1,
+		'text' => '<p>Sambar deer are one of the most important tiger prey species. They are often abundant in tiger reserves in India and Nepal. They can also be found across Southeast Asia, but are much rarer there due to hunting.</p>',
 		'image' => isset( $media['sambar'] ) ? $media['sambar'] : null,
 		'caption' => 'Sambar foal and its mother in Ranthambore Tiger Reserve, India © Martin Harvey / WWF',
 	),
 	array(
-		'id' => 'pt-wildpig', 'wide' => false, 'side' => 'left',
-		'number' => '02', 'label' => 'Sumatra, Indonesia', 'heading' => 'Wild pig',
-		'status' => 'IUCN · Least concern', 'statusLevel' => 'least',
-		'hotspot' => array( 'x' => 66.5, 'y' => 79.4, 'w' => 20, 'h' => 20.6 ), 'zoom' => 1,
-		'body' => '<p>Wild pigs are the most widely distributed tiger prey species, occurring in every landscape in which tigers are found. On Sumatra they are one of the most important prey species of all. A female can have up to two litters a year, of four to eight piglets each.</p>',
+		'id' => 'hs-wildpig', 'side' => 'left', 'label' => 'Sumatra, Indonesia',
+		'title' => 'Wild pig', 'badge' => 'IUCN · Least concern', 'badgeLevel' => 'least',
+		'box' => array( 'x' => 66.5, 'y' => 79.4, 'w' => 20, 'h' => 20.6 ), 'zoom' => 1,
+		'text' => '<p>Wild pigs are the most widely distributed tiger prey species, occurring in every landscape in which tigers are found. On Sumatra they are one of the most important prey species of all. A female can have up to two litters a year, of four to eight piglets each.</p>',
 		'image' => isset( $media['wildpig'] ) ? $media['wildpig'] : null,
 		'caption' => 'Wild boar have brown fur that provides excellent camouflage in the forest © Ola Jennersten / WWF-Sweden',
 	),
 	array(
-		'id' => 'pt-banteng', 'wide' => false, 'side' => 'right',
-		'number' => '03', 'label' => 'Thailand', 'heading' => 'Banteng',
-		'status' => 'IUCN · Endangered', 'statusLevel' => 'endangered',
-		'hotspot' => array( 'x' => 66.2, 'y' => 55.5, 'w' => 14, 'h' => 18.3 ), 'zoom' => 1,
-		'body' => '<p>One of the largest tiger prey species: banteng are wild cattle, classified as Endangered. Historic hunting and a current snaring crisis across Southeast Asia have driven their populations down — but in Thailand there are signs of hope.</p><p>A <a href="https://www.sciencedirect.com/science/article/pii/S2351989424002166" target="_blank" rel="noopener">recently published paper</a> showed banteng in Huai Kha Khaeng have doubled in 15 years, on the back of strong law enforcement and long-term investment in protecting a source tiger site.</p>',
+		'id' => 'hs-banteng', 'side' => 'right', 'label' => 'Thailand',
+		'title' => 'Banteng', 'badge' => 'IUCN · Endangered', 'badgeLevel' => 'endangered',
+		'box' => array( 'x' => 66.2, 'y' => 55.5, 'w' => 14, 'h' => 18.3 ), 'zoom' => 1,
+		'text' => '<p>One of the largest tiger prey species: banteng are wild cattle, classified as Endangered. Historic hunting and a current snaring crisis across Southeast Asia have driven their populations down — but in Thailand there are signs of hope.</p><p>A <a href="https://www.sciencedirect.com/science/article/pii/S2351989424002166" target="_blank" rel="noopener">recently published paper</a> showed banteng in Huai Kha Khaeng have doubled in 15 years, on the back of strong law enforcement and long-term investment in protecting a source tiger site.</p>',
 		'image' => isset( $media['banteng'] ) ? $media['banteng'] : null,
 		'caption' => 'A male banteng in Kuiburi National Park, Thailand © Wayuphong Jitvijak / WWF-Greater Mekong',
 	),
 	array(
-		'id' => 'pt-bukhara', 'wide' => false, 'side' => 'left',
-		'number' => '04', 'label' => 'Kazakhstan', 'heading' => "Bukhara\ndeer",
-		'status' => 'Central Asian red deer', 'statusLevel' => '',
-		'hotspot' => array( 'x' => 52, 'y' => 16, 'w' => 15.5, 'h' => 20 ), 'zoom' => 1,
-		'body' => '<p>In Central Asia a different set of species matters. Bukhara deer — the Central Asian subspecies of red deer — are increasing thanks to conservation work. Restoring healthy numbers is key to a landmark reintroduction: tigers went extinct in Kazakhstan over 70 years ago, and are planned to return within a few years.</p>',
+		'id' => 'hs-bukhara', 'side' => 'left', 'label' => 'Kazakhstan',
+		'title' => "Bukhara\ndeer", 'badge' => 'Central Asian red deer', 'badgeLevel' => '',
+		'box' => array( 'x' => 52, 'y' => 16, 'w' => 15.5, 'h' => 20 ), 'zoom' => 1,
+		'text' => '<p>In Central Asia a different set of species matters. Bukhara deer — the Central Asian subspecies of red deer — are increasing thanks to conservation work. Restoring healthy numbers is key to a landmark reintroduction: tigers went extinct in Kazakhstan over 70 years ago, and are planned to return within a few years.</p>',
 		'image' => isset( $media['bukhara'] ) ? $media['bukhara'] : null,
 		'caption' => 'Newly released bukhara deer, Kazakhstan © WWF',
 	),
 	array(
-		'id' => 'pt-nilgai', 'wide' => false, 'side' => 'right',
-		'number' => '05', 'label' => 'India', 'heading' => 'Nilgai',
-		'status' => 'IUCN · Least concern', 'statusLevel' => 'least',
-		'hotspot' => array( 'x' => 46.2, 'y' => 42, 'w' => 17.7, 'h' => 33.9 ), 'zoom' => 1,
-		'body' => '<p>Nilgai are the largest antelope in Asia. Thin legs, a large torso, a wide neck and a small head make them unmistakable. Found mostly in India and parts of Nepal, they weigh roughly 100–288 kg depending on sex.</p>',
+		'id' => 'hs-nilgai', 'side' => 'right', 'label' => 'India',
+		'title' => 'Nilgai', 'badge' => 'IUCN · Least concern', 'badgeLevel' => 'least',
+		'box' => array( 'x' => 46.2, 'y' => 42, 'w' => 17.7, 'h' => 33.9 ), 'zoom' => 1,
+		'text' => '<p>Nilgai are the largest antelope in Asia. Thin legs, a large torso, a wide neck and a small head make them unmistakable. Found mostly in India and parts of Nepal, they weigh roughly 100–288 kg depending on sex.</p>',
 		'image' => isset( $media['nilgai'] ) ? $media['nilgai'] : null,
 		'caption' => 'Nilgai in Ranthambore Tiger Reserve, India © Ola Jennersten / WWF-Sweden',
 	),
 	array(
-		'id' => 'pt-chital', 'wide' => false, 'side' => 'left',
-		'number' => '06', 'label' => 'Nepal & India', 'heading' => 'Chital',
-		'status' => 'IUCN · Least concern', 'statusLevel' => 'least',
-		'hotspot' => array( 'x' => 56.4, 'y' => 40.7, 'w' => 11.4, 'h' => 14.8 ), 'zoom' => 1,
-		'body' => '<p>Also known as spotted deer, chital are an important and abundant prey species for tigers in India and Nepal. They are also found in Bangladesh and Bhutan.</p>',
+		'id' => 'hs-chital', 'side' => 'left', 'label' => 'Nepal & India',
+		'title' => 'Chital', 'badge' => 'IUCN · Least concern', 'badgeLevel' => 'least',
+		'box' => array( 'x' => 56.4, 'y' => 40.7, 'w' => 11.4, 'h' => 14.8 ), 'zoom' => 1,
+		'text' => '<p>Also known as spotted deer, chital are an important and abundant prey species for tigers in India and Nepal. They are also found in Bangladesh and Bhutan.</p>',
 		'image' => isset( $media['chital'] ) ? $media['chital'] : null,
 		'caption' => 'Chital on a camera trap in the Khata Corridor, Nepal © DoFSC / WWF Nepal',
-	),
-	array(
-		'id' => 'pt-outro', 'wide' => true, 'side' => 'left',
-		'label' => 'And many more', 'heading' => 'Six of many',
-		'body' => "<p>These are just a few of the many tiger prey species. Other important ungulates across the tiger's range include gaur, roe deer, sika deer, hog deer, muntjac, barasingha and eld's deer.</p>",
-		'image' => null, 'caption' => '', 'hotspot' => null, 'zoom' => 1,
-		'number' => '', 'status' => '', 'statusLevel' => '',
 	),
 );
 
 $attrs = array(
 	'align'           => 'full',
-	'sectionTitle'    => 'Tiger range countries',
+	'sectionTitle'    => "What do\ntigers eat?",
+	'leadText'        => "We talk a lot about tiger prey — but what animals do tigers actually eat?\nThe most important tiger prey are ungulates: mammals with hooves, such as large deer, wild cattle and wild pigs. Scroll on to travel to some of the places where tiger prey are found.",
+	'closingText'     => "These are just a few of the many tiger prey species. Other important ungulates across the tiger's range include gaur, roe deer, sika deer, hog deer, muntjac, barasingha and eld's deer.",
 	'backgroundImage' => isset( $media['map'] ) ? $media['map'] : null,
 	/* The original anchors the map crop to its left edge — that is where the
 	   artwork's own title and legend live. */
@@ -166,7 +149,7 @@ $attrs = array(
 	'cardColor'       => '#071a11',
 	'dimOpacity'      => 0.62,
 	'cardOpacity'     => 0.84,
-	'points'          => $points,
+	'hotspots'        => $hotspots,
 );
 
 $content = serialize_block( array(

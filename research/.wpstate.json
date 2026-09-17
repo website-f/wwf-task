@@ -1,0 +1,75 @@
+{
+  "cookies": [
+    {
+      "name": "wordpress_a9a2a986b842c9f42fcb3e704f3e6791",
+      "value": "admin%7C1789785875%7CRfDVAyCZy6YNsMA3Z7ur4GXQ1T5d199Q0oVCC3buZaU%7Caabafa8b82b08d10cfd2c9992bf94baff6cb6022dff98d3891366b1a678a579d",
+      "domain": "localhost",
+      "path": "/wp-content/plugins",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wordpress_a9a2a986b842c9f42fcb3e704f3e6791",
+      "value": "admin%7C1789785875%7CRfDVAyCZy6YNsMA3Z7ur4GXQ1T5d199Q0oVCC3buZaU%7Caabafa8b82b08d10cfd2c9992bf94baff6cb6022dff98d3891366b1a678a579d",
+      "domain": "localhost",
+      "path": "/wp-admin",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wordpress_test_cookie",
+      "value": "WP%20Cookie%20check",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wordpress_logged_in_a9a2a986b842c9f42fcb3e704f3e6791",
+      "value": "admin%7C1789785875%7CRfDVAyCZy6YNsMA3Z7ur4GXQ1T5d199Q0oVCC3buZaU%7C3058a030f642f072fe078688846b1e2fb7fc33f3c3d07ae8388c304bf2cc7839",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wp-settings-1",
+      "value": "libraryContent%3Dbrowse",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1821149095,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wp-settings-time-1",
+      "value": "1789613075",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1821149095,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:8280",
+      "localStorage": [
+        {
+          "name": "WP_DATA_USER_1",
+          "value": "{\"core/block-editor\":{\"preferences\":{\"insertUsage\":{\"wwf/scrollmap\":{\"time\":1789613091287,\"count\":1}}}}}"
+        }
+      ]
+    }
+  ]
+}

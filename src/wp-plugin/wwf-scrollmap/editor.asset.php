@@ -10,6 +10,7 @@ return array(
 		'wp-block-editor',
 		'wp-components',
 		'wp-data',
+		'wp-api-fetch',
 		'wp-i18n',
 	),
 	'version'      => '2.0.0',

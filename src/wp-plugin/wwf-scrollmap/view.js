@@ -1,8 +1,10 @@
 /* ===========================================================================
    WWF "Tiger Range Countries" — scroll-map engine
    ---------------------------------------------------------------------------
-   This is the standalone src/standalone/scrollmap.js, with one addition: a
-   DOM-ready boot, because WordPress controls where the script tag lands.
+   THE webpart's engine. No CMS anywhere in this file — it is driven entirely
+   by data- attributes, and can also render itself from a JSON blob that
+   matches scrollmap.schema.json (see hydrate() below). Adapters for WordPress,
+   Drupal, SharePoint and headless CMSs all feed it the same thing.
 
    Dependency: GSAP 3 + ScrollTrigger (vendored in ./vendor, ~115KB).
    Why a library rather than hand-rolled:
@@ -36,9 +38,50 @@
   var PAW_PATH =
     'M12 14.5c2.9 0 5.3 2 5.3 4.1 0 1.6-1.4 2.6-3.1 2.6-1 0-1.6-.3-2.2-.3s-1.2.3-2.2.3c-1.7 0-3.1-1-3.1-2.6 0-2.1 2.4-4.1 5.3-4.1zM6.6 8.6c1.2-.3 2.5.7 2.9 2.2.4 1.5-.3 3-1.5 3.3-1.2.3-2.5-.7-2.9-2.2-.4-1.5.3-3 1.5-3.3zm10.8 0c1.2.3 1.9 1.8 1.5 3.3-.4 1.5-1.7 2.5-2.9 2.2-1.2-.3-1.9-1.8-1.5-3.3.4-1.5 1.7-2.5 2.9-2.2zM10.4 3.4c1.2 0 2.2 1.3 2.2 2.9s-1 2.9-2.2 2.9S8.2 7.9 8.2 6.3s1-2.9 2.2-2.9zm3.2 0c1.2 0 2.2 1.3 2.2 2.9s-1 2.9-2.2 2.9-2.2-1.3-2.2-2.9 1-2.9 2.2-2.9z';
 
-  /* WordPress may print this script before the block markup (or after it,
-     depending on the theme), so boot on DOM ready as well as immediately. */
-  function boot() { document.querySelectorAll('[data-tgr]').forEach(init); }
+  /* ----------------------------------------------------------------------
+     SELF-RENDERING, for CMSs that emit JSON rather than markup.
+
+       <div data-tgr-json='{ …scrollmap.schema.json… }'></div>
+
+       <script type="application/json" id="map1">{ … }</script>
+       <div data-tgr-src="#map1"></div>
+
+     Either form is turned into the real markup by scrollmap-render.js and then
+     booted like any other instance. This is what lets a headless CMS, a SPA or
+     a SharePoint web part use the webpart with no server-side templating: emit
+     the JSON, include two scripts, done. A CMS that CAN template (WordPress,
+     Drupal) renders server-side instead and never touches this path.
+     -------------------------------------------------------------------- */
+  function hydrate() {
+    var slots = document.querySelectorAll('[data-tgr-json], [data-tgr-src]');
+    if (!slots.length) return;
+    if (!window.ScrollMapRender) {
+      console.error('[scrollmap] data-tgr-json needs scrollmap-render.js loaded first.');
+      return;
+    }
+    slots.forEach(function (slot) {
+      if (slot.dataset.tgrHydrated) return;
+      slot.dataset.tgrHydrated = '1';
+      try {
+        var raw = slot.dataset.tgrJson;
+        if (!raw && slot.dataset.tgrSrc) {
+          var src = document.querySelector(slot.dataset.tgrSrc);
+          raw = src && src.textContent;
+        }
+        var content = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        var check = window.ScrollMapRender.validate(content);
+        if (!check.ok) console.warn('[scrollmap] content problems:', check.errors);
+        slot.outerHTML = window.ScrollMapRender(content);
+      } catch (e) {
+        console.error('[scrollmap] could not render from JSON:', e);
+      }
+    });
+  }
+
+  function boot() {
+    hydrate();
+    document.querySelectorAll('[data-tgr]').forEach(init);
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 

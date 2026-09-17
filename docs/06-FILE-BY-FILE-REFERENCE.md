@@ -26,22 +26,32 @@ wwf-task/
 │   ├── scrollpoints-css.txt        the extracted CSS rules
 │   └── shots/                      desktop-*/mobile-* = ORIGINAL
 │                                   new-*/wp-* = THIS BUILD (see shots/README.md)
+├── tools/                          sync-core.js · check-parity.js
 └── src/
-    ├── standalone/                 TASK 1
-    │   ├── index.html   (277 ln)   markup + demo scaffolding
-    │   ├── scrollmap.css (496 ln)  ── shared byte-for-byte with the plugin
-    │   ├── scrollmap.js  (490 ln)  ── shared with the plugin (+ a DOM-ready boot)
-    │   ├── vendor/                 GSAP 3.13 + ScrollTrigger, vendored
+    ├── core/                       ★ THE WEBPART — no CMS anywhere in it
+    │   ├── scrollmap.schema.json   the contract every adapter maps onto
+    │   ├── scrollmap.css           all styling
+    │   ├── scrollmap.js            the engine (+ self-render from JSON)
+    │   ├── scrollmap-render.js     JSON → HTML; runs in Node AND the browser
+    │   ├── vendor/                 GSAP 3.13 + ScrollTrigger
+    │   └── README.md               "how to use this in any CMS"
+    ├── adapters/
+    │   ├── headless/               runnable: index.html + content.json, no template
+    │   ├── drupal-twig/            Twig template + Paragraph mapping + preprocess
+    │   └── sharepoint-spfx/        web part class + property pane
+    ├── standalone/                 TASK 1 demo — hand-written markup, same core
+    │   ├── index.html
     │   └── assets/                 map.jpg, wwf.woff, 6 prey photos
-    └── wp-plugin/                  TASK 2
+    └── wp-plugin/                  TASK 2 — the fully-built adapter
         ├── docker-compose.yml      wordpress + mariadb on :8280
         ├── seed-demo.php           idempotent seeder (also the migration example)
         └── wwf-scrollmap/          the plugin
 ```
 
-🗣 **The one-sentence architecture:** "Two of the three Task 1 files are the plugin's
-front-end files, unchanged. The standalone file was written to be CMS output, so nothing had
-to change when it became a block."
+🗣 **The one-sentence architecture:** "`src/core/` is the webpart — a JSON schema, a
+stylesheet and an engine, with no CMS in it. Everything else is an adapter that maps a CMS
+onto that schema, and `tools/check-parity.js` proves the adapters agree by rendering the same
+content through PHP, the browser and Node and diffing the result."
 
 ---
 
@@ -172,16 +182,27 @@ Imports the 7 images **with alt text**, builds the whole attribute payload, wrap
 
 ## `wwf-scrollmap/wwf-scrollmap.php`
 
-Registers the block, and registers GSAP + ScrollTrigger as normal WordPress script handles
-from `vendor/`. 🗣 "Vendored, not CDN: no third-party runtime dependency, works behind a
+Registers the block, registers GSAP + ScrollTrigger as normal WordPress script handles from
+`vendor/`, **and holds the five template helpers that `render.php` calls**.
+
+🗣 *"The helpers live in the bootstrap, not in the render template, and that is not
+style — a block render template is included once PER INSTANCE, and `supports.multiple` lets a
+page hold several. Declaring functions there fatals with 'Cannot redeclare' on the second one.
+I hit exactly that, and the fix is architectural: the template is a template, the plugin file
+owns the functions."* 🗣 "Vendored, not CDN: no third-party runtime dependency, works behind a
 firewall, version pinned by the deploy. Registering them as *handles* means WordPress
 deduplicates if another plugin also wants GSAP — that's why it isn't a hard-coded script tag."
 
 ## `wwf-scrollmap/block.json` — the contract
 
-Attribute schema (`sectionTitle`, `backgroundImage`, `focalX/Y`, `showPaws/showMarkers/showRail`,
-`accentColor`/`inkColor`/`backdropColor`/`cardColor`, `dimOpacity`, `cardOpacity`, `points[]`),
-asset wiring, `supports.multiple`, `supports.html: false`, and `render: file:./render.php`.
+The attribute schema is deliberately split in two. The top half is **the brief's own field
+list** — `sectionTitle`, `leadText`, `closingText`, `backgroundImage`, `hotspots[]`. The bottom
+half is everything optional (`focalX/Y`, the three motion switches, four colours, two
+opacities), which the editor folds into one collapsed *Advanced* panel. Plus asset wiring,
+`supports.multiple`, `supports.html: false`, and `render: file:./render.php`.
+
+🗣 *"An editor's default view is the four things the brief asks for. Nothing else is on
+screen unless they go looking."*
 
 🗣 "Attributes, not a custom post type: the block stays copy-pasteable between pages, works
 in synced patterns, and versions with post revisions — free rollback. `html: false` stops an
@@ -212,9 +233,10 @@ Plain `wp.element.createElement`, no build step. 🗣 "In a product codebase thi
 | Piece | Notes |
 |---|---|
 | `clampBox()` | the bounds rule in **one** place, used by drawing, moving, resizing and the number fields alike |
-| `DEMO` | the 8 real chapters — "Load the tiger demo content" seeds full parity in one click |
-| validation | **hard** errors call `lockPostSaving()` and are listed with reasons (map, section title, ≥1 chapter, chapter needs text, map chapter needs a region); **soft** warnings (missing alt text) never block |
+| `DEMO_*` | the finished tiger story — "Or load the tiger example" fills a blank block in one click |
+| validation | **hard** errors call `lockPostSaving()` and are listed as a plain "Still to do" list (map, section title, ≥1 hotspot, a hotspot with no text); **soft** warnings (missing alt text) never block. When it is all clear the same panel turns green and points at Preview |
 | `update / add / remove / move / duplicate` | immutable array ops through `setAttributes`. 🗣 "Which is why undo/redo and post revisions work without a line of code from me." |
+| the 4-step strip | `① Map image ② Title & lead text ③ Hotspots ④ Preview, then publish`, ticking itself off — the brief's bullets, on screen |
 | `onDown / onMove / onUp` | one handler set, three gestures: **draw** a region, **move** it from the middle, **resize** from a corner. Verified working by driving real mouse events through Playwright |
 | layout guide | ghost boxes showing where the region will land and where the card will sit — 🗣 "the 'card never covers the region' rule made visible at edit time instead of at preview time" |
 | card preview | heading, status chip and rich body edited *inside* a styled card under the map |

@@ -4,6 +4,10 @@ Target: Task 1 demo 3 min → code walkthrough 7 min → Task 2 demo + plan 8 mi
 🗣 = say this out loud. Every class name and line reference below was checked against the
 current code.
 
+**Revising from scratch?** [`10-TASK1-EXPLAINED.md`](10-TASK1-EXPLAINED.md) and
+[`11-TASK2-EXPLAINED.md`](11-TASK2-EXPLAINED.md) explain every class, style and animation
+assuming no prior knowledge. Read those first, then use this script for the running order.
+
 Deep detail: [`05-CODE-EXPLANATION.md`](05-CODE-EXPLANATION.md) ·
 file index: [`06-FILE-BY-FILE-REFERENCE.md`](06-FILE-BY-FILE-REFERENCE.md) ·
 editor manual: [`07-EDITOR-GUIDE.md`](07-EDITOR-GUIDE.md)
@@ -175,12 +179,20 @@ screenshotting every chapter in headless Chromium and reading the console."
 `view.js` is the Task 1 engine — the only change is a DOM-ready boot, because WordPress decides
 where the script tag goes."
 
-### 4.2 Then the editing experience — the part that matters
+### 4.2 The brief's four bullets, one at a time
+
+🗣 "Task 2 lists four things an editor has to be able to do, so I built the editor
+around exactly those four and folded everything else out of sight."
+
+Point at the **four-step strip** across the top of the block: *Map image · Title & lead text ·
+Hotspots · Preview, then publish*. It ticks itself off.
+
+### 4.3 Then the editing experience — the part that matters
 
 wp-admin → Pages → *Tiger Range Countries*.
 
-1. 🗣 "The editor gets the real map with every chapter's region drawn on it, numbered."
-2. **Click a numbered badge** → the chapter selects, the card preview below updates.
+1. 🗣 "The editor gets the real map with every hotspot drawn on it, numbered."
+2. **Click a numbered badge** → the hotspot selects, the card preview below updates.
 3. **Drag the box** to move it. **Drag a corner** to resize it. 🗣 "Nobody types coordinates.
    The X/Y/W/H fields exist in the sidebar for fine-tuning, and they and the mouse share one
    `clampBox` function, so a region can never leave the artwork — and the server re-applies the
@@ -192,20 +204,27 @@ wp-admin → Pages → *Tiger Range Countries*.
    each line animates in separately, so typography stays an editorial decision."
 6. Sidebar tour: **Map** (image, section title, framing sliders), **Motion** (paw trail, pins,
    rail — all switchable), **Colours** (brand palette + dim/opacity).
-7. **Chapters** panel: ↑ ↓ to reorder, ⧉ duplicate, 🗑 remove, **+ Map chapter** /
-   **+ Text chapter**. Then **Ctrl+Z**. 🗣 "Undo is free — every change goes through
-   `setAttributes`, so it's in the editor's undo stack and in post revisions."
-8. **Validation beat:** delete the section title → Publish locks and the sidebar lists exactly
-   why; empty a chapter → its row turns red. 🗣 "Hard rules block publishing. Alt-text gaps
-   only warn — an accessibility nudge should never stop someone doing their job."
-9. **Preview → Mobile**, then **Preview in new tab**. 🗣 "Real front end, from the draft."
+7. **3 · Hotspots** panel: ↑ ↓ reorder, ⧉ duplicate, 🗑 remove, **+ Add hotspot** (which
+   drops you straight into drawing mode). Then **Ctrl+Z**. 🗣 "Undo is free — every change
+   goes through `setAttributes`, so it's in the editor's undo stack and in post revisions.
+   And notice there's no number field: numbering comes from position, so reordering renumbers
+   itself and there's one less thing for an editor to keep in sync."
+8. **Validation beat:** delete the section title → Publish locks and the panel lists exactly
+   what is missing; empty a hotspot → its row turns red. 🗣 "Hard rules block publishing.
+   Alt-text gaps only warn — an accessibility nudge should never stop someone doing their job."
+9. **Preview → Mobile**, then **Preview in new tab**. 🗣 "Real front end, from the draft.
+   That's bullet four, and it's native WordPress — which is an argument *for* the platform,
+   not a gap in the block."
+10. 🗣 "And everything that isn't one of those four bullets — framing, motion, colours,
+   per-hotspot zoom, raw coordinates — is in one collapsed Advanced panel. The default view
+   is four panels and a status box."
 
-### 4.3 The plan (slides / `02-CMS-INTEGRATION-PLAN.md`)
+### 4.4 The plan (slides / `02-CMS-INTEGRATION-PLAN.md`)
 
-🗣 "Everything hard-coded in Task 1 is a block attribute: the map plus a focal point, three
-motion switches, four colours and two opacities, and an ordered array of chapters — each with
-a side, a label, a number, a heading, a status chip, rich body, a photo, a caption, a zoom
-strength and an optional region in percentage coordinates.
+🗣 "The schema is the brief's own field list: a section title, lead text, optional closing
+text, a map image, and an ordered array of hotspots — each with a location label, a title,
+rich text, an image and caption, which side the text sits on, and its region in percentage
+coordinates. Everything optional — framing, motion, colours, zoom — sits below that line.
 
 Attributes, not a custom post type — so the block is copy-pasteable between pages, works in
 synced patterns, and versions with post revisions.
@@ -257,11 +276,13 @@ stacked under it — `.tgr:not(.is-ready)` undoes the sticky overlay. Content fi
 **Browser support?** 🗣 "Sticky, `dvh`, `clip-path`, `backdrop-filter` and ScrollTrigger are all
 fine in current Chrome, Firefox, Safari and Edge. `backdrop-filter` degrades to a solid card."
 
-**How did you verify any of this?** 🗣 "Playwright. Every chapter screenshotted at 1600×900 and
-390×844, on the standalone and on the WordPress page, console watched for errors. The drag,
-move and resize interactions in the editor are driven by real mouse events in a test — that's
-how I found that overlapping regions made boxes unclickable, which is why the selected box now
-lifts above the others."
+**How did you verify any of this?** 🗣 "Playwright, end to end. Every step screenshotted at
+1600×900 and 390×844, on the standalone and on the WordPress page, console watched throughout.
+The editor operations are driven by real mouse events: reorder swaps the rows, add takes it to
+seven, remove takes it back to six, and dragging a box moved it from 56.4% to 62.3%. That's
+also how I found two bugs — overlapping regions made boxes unclickable, and putting two blocks
+on one page fatalled with 'Cannot redeclare' because the render template declared its own
+helper functions."
 
 **What would you do with more time?** 🗣 "Split the map artwork into a clean base map plus
 data-driven pins, so the tiger counts become editable and translatable — my hotspot model

@@ -1,0 +1,154 @@
+{#
+  ═══════════════════════════════════════════════════════════════════════════
+  Scroll Map — Drupal / Twig adapter
+
+  Server-side render, for a CMS that templates. Produces exactly the markup
+  that core/scrollmap-render.js produces and that the WordPress plugin's
+  render.php produces — tools/check-parity.js asserts all three agree.
+
+  EXPECTS one variable, `map`, matching core/scrollmap.schema.json:
+
+      { sectionTitle, leadText, closingText,
+        map:      { src, alt, width, height },
+        hotspots: [ { label, title, text, image:{src,alt}, caption,
+                      side, box:{x,y,w,h}, zoom, badge, badgeLevel } ],
+        options:  { focal:{x,y}, paws, markers, rail,
+                    theme:{accent,ink,backdrop,card,dim,cardOpacity} } }
+
+  A preprocess function builds that from your entity — see README.md in this
+  folder for the Paragraph field mapping and the _preprocess hook.
+
+  SANITISATION: `hotspot.text` is printed with |raw because it is rich text.
+  Run it through Drupal's text format filtering (check_markup) in the
+  preprocess, exactly as WordPress runs wp_kses. Never hand this template
+  unfiltered user input.
+  ═══════════════════════════════════════════════════════════════════════════
+#}
+
+{% set o     = map.options|default({}) %}
+{% set theme = o.theme|default({}) %}
+{% set focal = o.focal|default({'x': 50, 'y': 50}) %}
+
+{% set accent   = theme.accent|default('#8fd14f') %}
+{% set ink      = theme.ink|default('#f2efe6') %}
+{% set backdrop = theme.backdrop|default('#04140d') %}
+{% set card     = theme.card|default('#071a11') %}
+{% set dim      = theme.dim|default(0.62) %}
+{% set cardOp   = theme.cardOpacity|default(0.84) %}
+
+{# rgb() is a tiny Twig extension — see README.md. Or precompute the three
+   rgba strings in the preprocess and pass them in; that needs no extension. #}
+{% set style %}
+--accent:{{ accent }}; --ink:{{ ink }}; --ink-dim:rgba({{ ink|scrollmap_rgb }},0.66); --forest:{{ backdrop }}; --dim:{{ dim }}; --card-bg:rgba({{ card|scrollmap_rgb }},{{ cardOp }}); --card-border:rgba({{ ink|scrollmap_rgb }},0.16);
+{% endset %}
+
+{% set flat_title = map.sectionTitle|default('')|replace({"\n": ' '})|trim %}
+
+<section class="tgr"
+         style="{{ style|trim }}"
+         data-tgr
+         data-focal="{{ focal.x }} {{ focal.y }}"
+         data-paws="{{ o.paws is same as(false) ? 'off' : 'on' }}"
+         data-markers="{{ o.markers is same as(false) ? 'off' : 'on' }}"
+         data-rail="{{ o.rail is same as(false) ? 'off' : 'on' }}"
+         {% if flat_title %}aria-label="{{ flat_title }}"{% endif %}>
+
+  <div class="tgr__stage">
+    <div class="tgr__camera">
+      <img class="tgr__map" src="{{ map.map.src }}" alt="{{ map.map.alt|default('') }}"
+           {% if map.map.width %}width="{{ map.map.width }}"{% endif %}
+           {% if map.map.height %}height="{{ map.map.height }}"{% endif %}
+           fetchpriority="high" decoding="async">
+    </div>
+    <div class="tgr__grade" aria-hidden="true"></div>
+    <div class="tgr__frame" aria-hidden="true"></div>
+    <div class="tgr__chip" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+      <span class="tgr__chip-t"></span>
+    </div>
+    <div class="tgr__bar" aria-hidden="true"></div>
+  </div>
+
+  <div class="tgr__steps">
+
+    {# ---- opening card: section title + lead text ------------------------ #}
+    {% if map.sectionTitle or map.leadText %}
+      <article class="step step--wide" data-side="right" data-zoom="1"
+               {% if flat_title %}data-label="{{ flat_title }}"{% endif %}>
+        <div class="step__pin"><div class="card">
+          {% if map.sectionTitle %}
+            <h2 class="h2 title">
+              {%- for line in map.sectionTitle|split("\n") -%}
+                {%- if line|trim -%}<span class="w"><span>{{ line|trim }}</span></span>{%- endif -%}
+              {%- endfor -%}
+            </h2>
+          {% endif %}
+          {%- for para in map.leadText|default('')|split("\n") -%}
+            {%- if para|trim -%}<p class="lede">{{ para|trim }}</p>{%- endif -%}
+          {%- endfor -%}
+        </div></div>
+      </article>
+    {% endif %}
+
+    {# ---- one card per hotspot ------------------------------------------- #}
+    {% for hs in map.hotspots %}
+      {% if hs.box %}
+        <article class="step"
+                 data-side="{{ hs.side == 'left' ? 'left' : 'right' }}"
+                 data-zoom="{{ hs.zoom|default(1) }}"
+                 {% if hs.label %}data-label="{{ hs.label }}"{% endif %}
+                 data-hotspot='{"x":{{ hs.box.x }},"y":{{ hs.box.y }},"w":{{ hs.box.w }},"h":{{ hs.box.h }}}'>
+          <div class="step__pin"><div class="card">
+
+            <div class="card__meta">
+              <span class="card__num">{{ '%02d'|format(loop.index) }}</span>
+              {% if hs.label %}<span class="card__region">{{ hs.label }}</span>{% endif %}
+            </div>
+
+            {% if hs.title|trim %}
+              <p class="h2">
+                {%- for line in hs.title|split("\n") -%}
+                  {%- if line|trim -%}<span class="w"><span>{{ line|trim }}</span></span>{%- endif -%}
+                {%- endfor -%}
+              </p>
+            {% endif %}
+
+            {% if hs.badge|trim %}
+              <span class="card__status"
+                    {% if hs.badgeLevel in ['least','vulnerable','endangered'] %}data-level="{{ hs.badgeLevel }}"{% endif %}>{{ hs.badge }}</span>
+            {% endif %}
+
+            {# already filtered in the preprocess with check_markup() #}
+            {{ hs.text|raw }}
+
+            {% if hs.image.src %}
+              <figure>
+                <div class="card__shot">
+                  <img src="{{ hs.image.src }}" alt="{{ hs.image.alt|default('') }}"
+                       {% if hs.image.width %}width="{{ hs.image.width }}"{% endif %}
+                       {% if hs.image.height %}height="{{ hs.image.height }}"{% endif %}
+                       loading="lazy" decoding="async">
+                </div>
+                {% if hs.caption %}<figcaption>{{ hs.caption }}</figcaption>{% endif %}
+              </figure>
+            {% endif %}
+
+          </div></div>
+        </article>
+      {% endif %}
+    {% endfor %}
+
+    {# ---- optional closing card ------------------------------------------ #}
+    {% if map.closingText %}
+      <article class="step step--wide" data-side="left" data-zoom="1"
+               data-label="{{ 'In closing'|t }}">
+        <div class="step__pin"><div class="card">
+          {%- for para in map.closingText|split("\n") -%}
+            {%- if para|trim -%}<p class="lede">{{ para|trim }}</p>{%- endif -%}
+          {%- endfor -%}
+        </div></div>
+      </article>
+    {% endif %}
+
+  </div>
+</section>

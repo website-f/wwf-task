@@ -1,0 +1,3 @@
+
+# built artefacts — rebuild with: node tools/build-plugin-zip.js
+dist/

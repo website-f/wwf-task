@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wwf.example/scrollmap.schema.json",
+  "title": "Scroll Map content",
+  "description": "The complete content of one scroll-map webpart. This file IS the contract between a CMS and the webpart: any CMS that can produce this object can render the webpart, with no CMS-specific code in the webpart itself. WordPress, Drupal, SharePoint and headless adapters all map their own storage onto this shape — see src/adapters/.",
+  "type": "object",
+  "required": ["sectionTitle", "map", "hotspots"],
+  "additionalProperties": false,
+
+  "properties": {
+    "sectionTitle": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required. The heading on the opening card, and the section's accessible name. A newline is a deliberate line break in the reveal animation.",
+      "examples": ["What do\ntigers eat?"]
+    },
+    "leadText": {
+      "type": "string",
+      "default": "",
+      "description": "The introduction, shown on the opening card before the first hotspot. Plain text; one paragraph per line."
+    },
+    "closingText": {
+      "type": "string",
+      "default": "",
+      "description": "Optional. Shown on a final card after the last hotspot. Plain text; one paragraph per line."
+    },
+
+    "map": {
+      "$ref": "#/definitions/image",
+      "description": "Required. The picture the reader is walked around — a map, floor plan, diagram, anything."
+    },
+
+    "hotspots": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered. Array order is scroll order, and the on-card numbering is derived from it.",
+      "items": { "$ref": "#/definitions/hotspot" }
+    },
+
+    "options": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": false,
+      "description": "Everything optional. A CMS may omit this entirely.",
+      "properties": {
+        "focal": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Which part of the map survives when it is cropped to the screen. x:0 keeps the left edge, 100 the right.",
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 100, "default": 50 },
+            "y": { "type": "number", "minimum": 0, "maximum": 100, "default": 50 }
+          }
+        },
+        "paws":    { "type": "boolean", "default": true, "description": "Animated trail between hotspots." },
+        "markers": { "type": "boolean", "default": true, "description": "Numbered pins on the map." },
+        "rail":    { "type": "boolean", "default": true, "description": "Jump-to bar along the bottom." },
+        "theme": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Design tokens. Emitted as CSS custom properties scoped to the section, so a page may hold several instances with different themes.",
+          "properties": {
+            "accent":      { "$ref": "#/definitions/hexColor", "default": "#8fd14f" },
+            "ink":         { "$ref": "#/definitions/hexColor", "default": "#f2efe6" },
+            "backdrop":    { "$ref": "#/definitions/hexColor", "default": "#04140d" },
+            "card":        { "$ref": "#/definitions/hexColor", "default": "#071a11" },
+            "dim":         { "type": "number", "minimum": 0, "maximum": 1, "default": 0.62 },
+            "cardOpacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.84 }
+          }
+        }
+      }
+    }
+  },
+
+  "definitions": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+    },
+
+    "image": {
+      "type": "object",
+      "required": ["src"],
+      "additionalProperties": true,
+      "description": "additionalProperties is open on purpose: a CMS may carry its own id, srcset, focal point or rendition data alongside, and the webpart will ignore what it does not know.",
+      "properties": {
+        "src":    { "type": "string", "minLength": 1, "description": "URL of the image." },
+        "alt":    { "type": "string", "default": "", "description": "Alt text. Empty is allowed but always warned about." },
+        "srcset": { "type": "string", "description": "Optional. Passed straight through to the <img>." },
+        "sizes":  { "type": "string", "description": "Optional. Passed straight through to the <img>." },
+        "width":  { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "box": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "description": "The highlighted region, as PERCENTAGES OF THE MAP IMAGE — never pixels. That is what makes one set of coordinates correct at every viewport size and for every rendition the CMS serves.",
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 98 },
+        "y": { "type": "number", "minimum": 0, "maximum": 98 },
+        "w": { "type": "number", "minimum": 2, "maximum": 100 },
+        "h": { "type": "number", "minimum": 2, "maximum": 100 }
+      }
+    },
+
+    "hotspot": {
+      "type": "object",
+      "required": ["box"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "type": "string", "description": "Stable key. Survives reordering; useful for deep links." },
+        "label": { "type": "string", "default": "", "description": "Short place name. Shown on the badge over the map and in the jump-to bar." },
+        "title": { "type": "string", "default": "", "description": "The card heading. Newlines are line breaks in the reveal." },
+        "text":  { "type": "string", "default": "", "description": "The card body as HTML, limited to p, br, em, strong, u and a[href|target|rel]. Anything else is stripped by the renderer — and should also be stripped by the CMS on save." },
+        "image":   { "$ref": "#/definitions/image" },
+        "caption": { "type": "string", "default": "", "description": "Sits under the image. Photo credit goes here." },
+        "side": {
+          "enum": ["left", "right"],
+          "default": "right",
+          "description": "Which half of the screen the TEXT occupies. The map always zooms the hotspot into the other half, which is what guarantees the text can never cover it."
+        },
+        "box":  { "$ref": "#/definitions/box" },
+        "zoom": { "type": "number", "minimum": 0.4, "maximum": 2.5, "default": 1, "description": "How hard the camera pushes in on this hotspot." },
+        "badge":      { "type": "string", "default": "", "description": "Optional pill under the title, e.g. a status." },
+        "badgeLevel": { "enum": ["", "least", "vulnerable", "endangered"], "default": "", "description": "Badge colour: neutral, green, amber, coral." }
+      }
+    }
+  }
+}

@@ -2,12 +2,12 @@
   "$schema": "https://schemas.wp.org/trunk/block.json",
   "apiVersion": 3,
   "name": "wwf/scrollmap",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "title": "Scroll Map",
   "category": "media",
   "icon": "location-alt",
-  "description": "A scroll-driven map: the camera flies and zooms to each highlighted region while story cards scroll past. Editors set the map, draw the regions, and write the cards.",
-  "keywords": ["map", "scrollytelling", "hotspot", "story", "zoom", "wwf"],
+  "description": "A map with hotspots. As the reader scrolls, the map zooms to each hotspot in turn and its text appears beside it. Add the block, pick a map, then draw the hotspots on it.",
+  "keywords": ["map", "hotspot", "scroll", "story", "zoom", "wwf"],
   "textdomain": "wwf-scrollmap",
   "supports": {
     "html": false,
@@ -15,27 +15,29 @@
     "align": ["full"],
     "spacing": { "margin": true }
   },
+
   "attributes": {
-    "align":           { "type": "string",  "default": "full" },
+    "align": { "type": "string", "default": "full" },
 
-    "sectionTitle":    { "type": "string",  "default": "" },
-    "backgroundImage": { "type": "object",  "default": null },
-    "focalX":          { "type": "number",  "default": 0 },
-    "focalY":          { "type": "number",  "default": 50 },
+    "sectionTitle":    { "type": "string", "default": "" },
+    "leadText":        { "type": "string", "default": "" },
+    "closingText":     { "type": "string", "default": "" },
+    "backgroundImage": { "type": "object", "default": null },
+    "hotspots":        { "type": "array",  "default": [] },
 
-    "showPaws":        { "type": "boolean", "default": true },
-    "showMarkers":     { "type": "boolean", "default": true },
-    "showRail":        { "type": "boolean", "default": true },
-
-    "accentColor":     { "type": "string",  "default": "#8fd14f" },
-    "inkColor":        { "type": "string",  "default": "#f2efe6" },
-    "backdropColor":   { "type": "string",  "default": "#04140d" },
-    "cardColor":       { "type": "string",  "default": "#071a11" },
-    "dimOpacity":      { "type": "number",  "default": 0.62 },
-    "cardOpacity":     { "type": "number",  "default": 0.84 },
-
-    "points":          { "type": "array",   "default": [] }
+    "focalX":        { "type": "number",  "default": 0 },
+    "focalY":        { "type": "number",  "default": 50 },
+    "showPaws":      { "type": "boolean", "default": true },
+    "showMarkers":   { "type": "boolean", "default": true },
+    "showRail":      { "type": "boolean", "default": true },
+    "accentColor":   { "type": "string",  "default": "#8fd14f" },
+    "inkColor":      { "type": "string",  "default": "#f2efe6" },
+    "backdropColor": { "type": "string",  "default": "#04140d" },
+    "cardColor":     { "type": "string",  "default": "#071a11" },
+    "dimOpacity":    { "type": "number",  "default": 0.62 },
+    "cardOpacity":   { "type": "number",  "default": 0.84 }
   },
+
   "editorScript": "file:./editor.js",
   "editorStyle":  "file:./editor.css",
   "style":        "file:./style.css",

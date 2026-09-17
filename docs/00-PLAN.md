@@ -29,19 +29,24 @@ Full measured spec (coordinates, colors, fonts, spacing) → `01-WEBPART-ANALYSI
 
 ## 2. Tech stack decision — Task 1
 
-**Choice: one standalone `index.html` — vanilla HTML + CSS + JavaScript. Zero dependencies.**
+**Choice: three plain files — `index.html`, `scrollmap.css`, `scrollmap.js` — plus exactly
+one runtime dependency: GSAP 3 + ScrollTrigger (~115KB, vendored locally).**
 
-Justification (say this in the interview):
+The brief says *"keep dependencies reasonable and justify your choices"*. Here is the
+justification, which is the honest engineering answer rather than a zero-dependency boast:
 
 | Option | Verdict |
 |---|---|
-| **Vanilla JS + IntersectionObserver** | ✅ Chosen. The whole effect is "toggle active card + move one absolutely-positioned div with a CSS transition". A library adds nothing but weight. Shows I understand the mechanics, not just an API. |
-| GSAP ScrollTrigger | Great tool, but overkill: we don't need scrubbed timelines, just enter/leave triggers. ~80KB dependency for what CSS `transition: 0.8s` already does. |
-| React/Vue | Wrong tool for a single static webpart; complicates CMS embedding (Task 2) where server-rendered HTML + a small JS enhancer is ideal. |
-| scrollama.js | Acceptable thin wrapper, but it's just IntersectionObserver inside — doing it directly is ~30 lines. |
+| **GSAP + ScrollTrigger** | ✅ Chosen. The hard part of this webpart is *scrubbed, interruptible, resize-correct* scroll animation — a camera that flies and zooms as you scroll, re-aims itself when the window changes size, and behaves the same scrolling up as down. ScrollTrigger is the industry-standard answer to exactly that problem, and it collapses ~250 lines of hand-rolled spring maths into ~40 lines of declaration. `gsap.matchMedia()` additionally scopes desktop / mobile / reduced-motion as three declarations and reverts each cleanly. |
+| Hand-rolled rAF + IntersectionObserver | What the first version of this build did. It worked, but the camera, the spotlight and the resize handling were mine to maintain and mine to defend — and functional values + `invalidateOnRefresh` are the bit that is genuinely fiddly to get right by hand. |
+| Lenis / ScrollSmoother | Nice inertia, but ScrollSmoother is a paid GSAP Club plugin and smooth-scroll hijacking is an accessibility risk. Skipped on purpose. |
+| React / Vue | Wrong tool for one presentational webpart, and it complicates Task 2, where server-rendered HTML plus a small JS enhancer is exactly what a CMS wants. |
+| Tailwind (play CDN) | Would shrink the CSS I hand-write, but the play CDN is not a production artefact, and the layout *is* the fidelity here — I want that code readable, not compiled from class soup. |
 
-The assignment explicitly says *"keep dependencies reasonable and justify your choices"* —
-zero dependencies with a clear explanation is the strongest possible answer.
+**Why one dependency and not more:** GSAP earns its place because it does something genuinely
+hard. Everything else — layout, the spotlight, the responsive split — is CSS, which is where
+it belongs. It is vendored into `src/standalone/vendor/` and into the plugin, so there is no
+CDN in the runtime path: the demo works offline and the version is pinned by the deploy.
 
 **Techniques used:**
 - `position: sticky` (with a fixed-position fallback pattern like Shorthand's attach
@@ -89,15 +94,22 @@ wwf-tiger-webpart/
 │   ├── 01-WEBPART-ANALYSIS.md   reverse-engineered spec, all measurements
 │   ├── 02-CMS-INTEGRATION-PLAN.md  Task 2 full plan
 │   ├── 03-CODE-WALKTHROUGH-SCRIPT.md  interview demo script + Q&A prep
-│   └── 04-ASSETS-CHECKLIST.md   asset inventory + licensing note
+│   ├── 04-ASSETS-CHECKLIST.md   asset inventory + licensing note
+│   ├── 05-CODE-EXPLANATION.md   deep technical doc + self code-review
+│   ├── 06-FILE-BY-FILE-REFERENCE.md  every file/function + known deviations
+│   └── 07-EDITOR-GUIDE.md       the non-technical editor's manual
 ├── research/
 │   ├── reference-page.html      downloaded original (725KB)
 │   ├── scrollpoints-clean.html  extracted section markup
 │   ├── scrollpoints-css.txt     extracted CSS rules
 │   └── assets/                  original map, wwf.woff, prey photos
-└── src/                     ← to be developed
-    ├── standalone/index.html    Task 1 deliverable (single file, no build)
-    └── wp-plugin/               Task 2 demo: wwf-scrollmap Gutenberg block
+└── src/
+    ├── standalone/              Task 1 — no build step
+    │   ├── index.html               markup + demo scaffolding
+    │   ├── scrollmap.css            ── shared byte-for-byte with the plugin
+    │   ├── scrollmap.js             ── shared with the plugin (+ DOM-ready boot)
+    │   └── vendor/                  GSAP 3.13 + ScrollTrigger, vendored
+    └── wp-plugin/               Task 2 — wwf-scrollmap Gutenberg block
 ```
 
 ## 5. Build milestones
@@ -114,21 +126,33 @@ wwf-tiger-webpart/
 6. **M6 — WP plugin demo** (~3–4h): block.json, editor sidebar with hotspot
    repeater (add/edit/reorder/remove), visual box-drawing on the image, render.php
    emitting the exact same markup as the standalone file, shared CSS/JS.
-7. **M7 — Rehearse** with `03-CODE-WALKTHROUGH-SCRIPT.md`.
+7. **M7 — Rehearse** with `03-CODE-WALKTHROUGH-SCRIPT.md` (+ `06-FILE-BY-FILE-REFERENCE.md`
+   open as the lookup table for "what does this file do" questions).
 
-## 6. Fidelity checklist (verify against original before demo)
+## 6. Fidelity checklist — verified against the original
 
-- [ ] Map pins at full viewport, no letterboxing at 16:9 (image is 4096×1957-class, ~2.09:1 — check `object-fit`/width behavior vs original: original uses `width:100%; min-height:100vh`)
-- [ ] First card appears after ~85vh of scroll (original: `padding-top:85vh` on first point)
-- [ ] Card rhythm: 50vh top / 30vh bottom padding per point; 20vh section bottom
-- [ ] Spotlight border 4px `#2a6788`, travel transition 0.8s
-- [ ] Dim = black at 50% only when a highlight is active
-- [ ] Cards: white overlay at 0.85 opacity, border-radius .5em, text #000, links #1155cc underlined
-- [ ] Headings: WWF font, uppercase, 220%→250%, line-height 1.1
-- [ ] Body: Open Sans 17px → 18/20/22px at wider breakpoints
-- [ ] Grid: card = 6/12 cols; left cards offset 0, right cards offset 6, center offset 3; ≤sm: 10–12 cols
-- [ ] Image captions in small caption style with © credits
-- [ ] `prefers-reduced-motion: reduce` → no traveling animation, instant states
+All measured from `research/`, then confirmed by capturing the original and the rebuild in
+headless Chromium at 1600×900 and 390×844 (`research/shots/desktop-*` vs `verify-*`).
+
+- [x] Map pins at full viewport, `object-fit: cover`, **anchored LEFT** (`data-focal="0 50"`)
+      — a centred crop eats the map's title at 16:9; this was the biggest fidelity catch
+- [x] First card appears after ~85vh of scroll (original: `padding-top:85vh` on first point)
+- [x] Card rhythm: 50vh top / 30vh bottom padding per point; 20vh section bottom
+- [x] Spotlight border 4px `#2a6788`, travel transition 0.8s ease
+- [x] Dim = black at 50%, only while a highlight is active
+- [x] Cards: white overlay at 0.85 opacity, border-radius .5em, text #000, links #1155cc underlined
+- [x] Headings: WWF font, uppercase, **160%→180%, line-height 1.2** — the h2 carries both
+      `Heading-Large` (220%) and `TextSize-xxsmall`, and the latter wins. Reading only the
+      first rule builds the heading too big.
+- [x] Body: Open Sans 17px → 18/20/22px at 620/1100/1600
+- [x] Grid: card = 6/12 cols; left offset 0, right offset 6, center offset 3; ≤sm 10 cols, ≤xs 12
+- [x] Image captions in small muted caption style with © credits
+- [x] `prefers-reduced-motion: reduce` → no traveling animation, instant states
+- [x] Cards render statically in faithful mode (the reveal animation is cinematic-only)
+- [x] <900px: no spotlight/dim, map pans full-bright behind full-width cards — matching the
+      original's separate mobile section
+
+Known deviations, all deliberate: see `06-FILE-BY-FILE-REFERENCE.md` → "Known deviations".
 
 ## 7. Risks / open questions
 

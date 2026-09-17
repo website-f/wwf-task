@@ -3,547 +3,262 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tiger Range Countries — Scroll-Map Webpart (WWF assignment rebuild)</title>
-<meta name="description" content="Recreation of the 'Tiger Range Countries' scrollpoints webpart from WWF's tiger-prey Shorthand story. Single file, zero dependencies.">
+<title>Tiger Range Countries — scroll-map webpart</title>
+<meta name="description" content="Scroll-driven map webpart rebuilt from WWF's tiger-prey Shorthand story. GSAP ScrollTrigger, sharing one stylesheet and one engine with the WordPress block.">
 
 <!--
-  ============================================================================
-  TASK 1 — Standalone rebuild of the 2nd webpart from:
-  https://wwftigers.shorthandstories.com/tiger-prey-why-theyre-crucial-to-ecosystems-across-asia/
+  ══════════════════════════════════════════════════════════════════════════
+  TASK 1 — "Tiger Range Countries" scroll-map webpart
+  Reference: https://wwftigers.shorthandstories.com/tiger-prey-why-theyre-crucial-to-ecosystems-across-asia/
 
-  Layer model (same as the original Shorthand "Scrollpoints" section):
-    1. A sticky, full-viewport STAGE holding the map image.
-    2. A traveling SPOTLIGHT FRAME — one element whose giant hard box-shadow
-       IS the dim and whose body IS the bright window (a real hole, so
-       alignment with the map is pixel-perfect by construction).
-    3. CARDS scrolling over the stage; an IntersectionObserver band at
-       mid-viewport decides the active card.
+  THREE FILES, and two of them are shared byte-for-byte with the CMS block:
+    scrollmap.css  ==  wp-plugin/wwf-scrollmap/style.css
+    scrollmap.js   ==  wp-plugin/wwf-scrollmap/view.js
+    index.html     ==  what wp-plugin/wwf-scrollmap/render.php prints
+  That is the architecture in one line: this file was written to be CMS
+  output, so nothing had to change when it became a block.
 
-  ANIMATION ENGINE — two modes (URL ?mode=… or data-mode on the section):
+  DEPENDENCY: GSAP 3.13 + ScrollTrigger, vendored locally (~115KB) so the demo
+  runs offline. Justification in docs/00-PLAN.md §2 — short version: the hard
+  part here is scrubbed, interruptible, resize-correct scroll animation, and
+  that is precisely what ScrollTrigger exists for.
 
-    · cinematic (default) — our own take, beyond the original:
-        - every animated value (camera x/y/zoom + frame box/opacity) runs
-          through a frame-rate-independent exponential SPRING in one rAF
-          loop, so animations are INTERRUPTIBLE: scroll back mid-flight and
-          the camera simply re-targets — no CSS-transition restarts, no jumps;
-        - the map PUSHES IN toward each hotspot on desktop (zoom ≈1.05–1.45),
-          biased away from the card so the region stays visible; on mobile it
-          flies fully to the region (zoom up to 2.6);
-        - the spotlight emits a soft GLOW PULSE when it arrives;
-        - a PROGRESS RAIL (right edge) shows position and jumps to any point;
-        - the rAF loop self-suspends when every spring settles — zero idle cost.
-
-    · faithful — exact original behaviour: CSS 0.8s ease spotlight travel,
-      no desktop zoom. Kept one query-param away for the fidelity comparison:
-      index.html?mode=faithful
-
-  Measured values (docs/01-WEBPART-ANALYSIS.md): dim #000 @ .5 · frame 4px
-  solid #2a6788 · travel .8s · card #fff @ .85, radius .5em · text #000 ·
-  links #1155cc · headings "WWF" font, uppercase, 160%→180%, lh 1.2 · body
-  Open Sans 17→22px · rhythm 85vh/50vh/30vh/20vh.
-  ============================================================================
+  DATA CONTRACT — everything the engine needs is in data- attributes:
+    on the section : data-tgr, data-focal="x% y%", data-paws/markers/rail
+    on each .step  : data-side, data-zoom, data-label, data-hotspot='{x,y,w,h}'
+  Hotspots are percentages of the MAP IMAGE, so they survive any viewport and
+  any image rendition. They are the original's own coordinates, extracted from
+  its DOM (docs/01-WEBPART-ANALYSIS.md §2).
+  ══════════════════════════════════════════════════════════════════════════
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="scrollmap.css">
 
 <style>
-/* ===========================================================================
-   0. Reset + fonts
-   ======================================================================== */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-@font-face {
-  font-family: "WWF";
-  src: url("assets/wwf.woff") format("woff");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-html { scroll-behavior: smooth; }
-
-body {
-  font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
-  color: #000;
-  background: #fff;
-  font-size: 17px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-@media (min-width: 620px)  { body { font-size: 18px; } }
-@media (min-width: 1100px) { body { font-size: 20px; } }
-@media (min-width: 1600px) { body { font-size: 22px; } }
-
-img { max-width: 100%; display: block; }
-
-.visually-hidden {
-  position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip-path: inset(50%); white-space: nowrap;
-}
-
-/* ===========================================================================
-   1. Demo scaffolding (not part of the webpart)
-   ======================================================================== */
-.demo-band {
-  min-height: 60vh;
-  display: grid; place-content: center; text-align: center;
-  background: #06281c; color: #fff; padding: 8vh 24px;
-}
-.demo-band h1 {
-  font-family: "WWF", sans-serif; font-weight: 400;
-  text-transform: uppercase; font-size: clamp(2.6rem, 7vw, 5.5rem);
-  line-height: 1.05; letter-spacing: .01em;
-}
-.demo-band p { opacity: .75; margin-top: 1em; font-size: .9em; }
-
-/* ===========================================================================
-   2. The webpart — .scrollmap
-   ======================================================================== */
-.scrollmap {
-  --dim: rgba(0, 0, 0, 0.5);
-  --hl-color: #2a6788;
-  --hl-border: 4px;
-  --hl-speed: 0.8s;
-  --card-bg: rgba(255, 255, 255, 0.85);
-  --tip-bg: #06281c;
-
-  position: relative;
-  background: #71bd5f;
-}
-
-/* --- 2.1 Sticky viewport + stage ---------------------------------------- */
-.scrollmap__viewport {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-.scrollmap__stage {
-  position: absolute;
-  inset: 0;                            /* no-JS fallback: fill the viewport */
-  transform-origin: 0 0;
-  transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);  /* faithful mode */
-  will-change: transform;
-}
-/* cinematic mode: the spring loop owns every animated property */
-.scrollmap--cinematic .scrollmap__stage,
-.scrollmap--cinematic .scrollmap__frame { transition: none; }
-
-.scrollmap__map {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  object-position: 50% 50%;
-}
-
-/* --- 2.2 The spotlight frame --------------------------------------------- */
-.scrollmap__frame {
-  position: absolute;
-  left: 40%; top: 40%; width: 20%; height: 20%;
-  outline: var(--hl-border) solid var(--hl-color);
-  box-shadow: 0 0 0 200vmax var(--dim);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    left   var(--hl-speed) ease,
-    top    var(--hl-speed) ease,
-    width  var(--hl-speed) ease,
-    height var(--hl-speed) ease,
-    opacity 0.5s ease;
-}
-.scrollmap__frame.is-active { opacity: 1; }
-
-/* arrival glow: replayed by re-adding .is-arrive (cinematic mode only) */
-.scrollmap__frame::after {
-  content: "";
-  position: absolute; inset: calc(-1 * var(--hl-border));
-  opacity: 0;
-  pointer-events: none;
-}
-.scrollmap__frame.is-arrive::after {
-  animation: scrollmap-pulse 0.9s ease-out forwards;
-}
-@keyframes scrollmap-pulse {
-  0% {
-    opacity: 1;
-    box-shadow:
-      0 0 0 2px  color-mix(in srgb, var(--hl-color) 90%, transparent),
-      0 0 26px 8px color-mix(in srgb, var(--hl-color) 55%, transparent);
+  /* Demo scaffolding only — NOT part of the webpart. In the CMS the theme
+     owns everything outside the block. */
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: #04140d; color: #f2efe6;
+         font-family: "Open Sans", system-ui, "Segoe UI", Arial, sans-serif; }
+  @font-face {
+    font-family: "WWF"; src: url("assets/wwf.woff") format("woff");
+    font-weight: 100 900; font-style: normal; font-display: swap;
   }
-  100% {
-    opacity: 0;
-    box-shadow:
-      0 0 0 18px color-mix(in srgb, var(--hl-color) 0%, transparent),
-      0 0 44px 18px color-mix(in srgb, var(--hl-color) 0%, transparent);
+  .demo {
+    min-height: 62vh; display: grid; place-content: center; text-align: center;
+    padding: 12vh 24px; gap: 14px;
+    background: radial-gradient(120% 100% at 50% 0%, #0d3a24 0%, #04140d 70%);
   }
-}
-
-/* --- 2.3 Hover/focus hotspot pins (bonus) -------------------------------- */
-.scrollmap__pin {
-  position: absolute;
-  background: transparent; border: 0; cursor: pointer;
-  border-radius: 8px;
-}
-.scrollmap__pin:hover,
-.scrollmap__pin:focus-visible {
-  outline: 2px dashed rgba(255, 255, 255, 0.9);
-  outline-offset: 2px;
-}
-.scrollmap__pin .tip {
-  position: absolute;
-  bottom: calc(100% + 10px); left: 0;
-  min-width: 180px; max-width: 240px;
-  background: var(--tip-bg); color: #fff;
-  text-align: left; font-size: 14px; line-height: 1.45;
-  padding: 10px 12px; border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-  opacity: 0; visibility: hidden; translate: 0 6px;
-  transition: opacity 0.25s ease, translate 0.25s ease, visibility 0.25s;
-  pointer-events: none;
-  z-index: 5;
-}
-.scrollmap__pin .tip strong { display: block; font-size: 15px; margin-bottom: 2px; }
-.scrollmap__pin .tip em { font-style: normal; opacity: .75; font-size: 12.5px; display: block; margin-top: 3px; }
-.scrollmap__pin[data-tip="left"] .tip { left: auto; right: 0; }
-.scrollmap__pin:hover .tip,
-.scrollmap__pin:focus-visible .tip { opacity: 1; visibility: visible; translate: 0 0; }
-
-/* --- 2.4 Progress rail (cinematic, ≥900px) -------------------------------
-   Built by JS from the points; sits inside the sticky viewport so it only
-   exists while the webpart is on screen.                                   */
-.scrollmap__rail {
-  position: absolute;
-  right: 18px; top: 50%;
-  translate: 0 -50%;
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 12px 8px;
-  background: rgba(0, 0, 0, 0.28);
-  border-radius: 999px;
-  backdrop-filter: blur(4px);
-  z-index: 6;
-}
-.scrollmap__rail button {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  border: 0; padding: 0; cursor: pointer;
-  background: rgba(255, 255, 255, 0.45);
-  transition: transform 0.25s ease, background 0.25s ease;
-  position: relative;
-}
-.scrollmap__rail button:hover,
-.scrollmap__rail button:focus-visible { background: #fff; transform: scale(1.25); }
-.scrollmap__rail button[aria-current="true"] { background: #fff; transform: scale(1.45); }
-.scrollmap__rail button .lbl {
-  position: absolute; right: calc(100% + 12px); top: 50%;
-  translate: 0 -50%;
-  background: rgba(0, 0, 0, 0.75); color: #fff;
-  font-size: 12px; line-height: 1; white-space: nowrap;
-  padding: 6px 10px; border-radius: 6px;
-  opacity: 0; visibility: hidden;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-}
-.scrollmap__rail button:hover .lbl,
-.scrollmap__rail button:focus-visible .lbl { opacity: 1; visibility: visible; }
-@media (max-width: 899px) { .scrollmap__rail { display: none; } }
-html:not(.js) .scrollmap__rail { display: none; }
-
-/* --- 2.5 The scrolling cards ---------------------------------------------- */
-.scrollmap__points {
-  position: relative; z-index: 3;
-  margin-top: -100vh;
-  margin-top: -100dvh;
-  padding-bottom: 20vh;
-}
-
-.scrollmap__point {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  column-gap: 24px;
-  max-width: 1560px;
-  margin-inline: auto;
-  padding: 50vh 40px 30vh;
-}
-.scrollmap__point:first-child { padding-top: 85vh; }
-
-.card                                    { grid-column: 4 / span 6; }
-.scrollmap__point[data-align="left"]  .card { grid-column: 1 / span 6; }
-.scrollmap__point[data-align="right"] .card { grid-column: 7 / span 6; }
-
-/* Reveal: card lifts in with a springy ease; children stagger.
-   (The original shows cards statically — this is a deliberate enhancement,
-   disabled under prefers-reduced-motion.)                                  */
-.card {
-  background: var(--card-bg);
-  border-radius: 0.5em;
-  padding: 20px 28px;
-  opacity: 0;
-  transform: translateY(30px) scale(0.985);
-  transition: opacity 0.65s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.card > * {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.55s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.card > *:nth-child(2) { transition-delay: 0.07s; }
-.card > *:nth-child(3) { transition-delay: 0.14s; }
-.card > *:nth-child(4) { transition-delay: 0.21s; }
-.card.is-revealed,
-.card.is-revealed > * { opacity: 1; transform: none; }
-html:not(.js) .card,
-html:not(.js) .card > * { opacity: 1; transform: none; }
-
-.card h2 {
-  font-family: "WWF", sans-serif;
-  font-weight: 400;
-  text-transform: uppercase;
-  font-size: 160%;
-  line-height: 1.2;
-  margin: 0.4em 0 0.3em;
-}
-.card p { margin: 0.5em 0; }
-.card em { font-style: italic; }
-.card a { color: #1155cc; text-decoration: underline; }
-.card a:hover { text-decoration: none; }
-
-.card figure { margin: 0.9em 0 0.4em; }
-.card figure img { width: 100%; height: auto; border-radius: 2px; }
-.card figcaption {
-  margin-top: 0.25em;
-  text-align: center;
-  opacity: 0.6;
-  font-size: 72%;
-  line-height: 1.4;
-}
-
-/* --- 2.6 Responsive -------------------------------------------------------- */
-@media (min-width: 1100px) {
-  .card { padding: 24px 32px; }
-  .card h2 { font-size: 180%; }
-}
-@media (max-width: 899px) {
-  .scrollmap__point { padding-left: 16px; padding-right: 16px; }
-  .card,
-  .scrollmap__point[data-align="left"] .card,
-  .scrollmap__point[data-align="right"] .card { grid-column: 1 / span 10; }
-  .scrollmap__frame { outline-width: 3px; }
-}
-@media (max-width: 619px) {
-  .card,
-  .scrollmap__point[data-align="left"] .card,
-  .scrollmap__point[data-align="right"] .card { grid-column: 1 / -1; }
-  .card { padding: 16px 20px; }
-}
-
-/* --- 2.7 Motion safety ------------------------------------------------------ */
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .scrollmap__stage,
-  .scrollmap__frame,
-  .card, .card > *,
-  .scrollmap__pin .tip,
-  .scrollmap__rail button { transition: none !important; }
-  .scrollmap__frame.is-arrive::after { animation: none; }
-  .card, .card > * { opacity: 1; transform: none; }
-}
+  .demo h1 {
+    font-family: "WWF", "Arial Narrow", sans-serif; font-weight: 400;
+    text-transform: uppercase; font-size: clamp(2.4rem, 8vw, 5rem);
+    line-height: .92; margin: 0;
+  }
+  .demo p { margin: 0; opacity: .62; font-size: .92rem; }
+  .demo .kicker { letter-spacing: .32em; text-transform: uppercase;
+                  font-size: 11px; opacity: .55; }
+  .demo .cue { margin-top: 26px; font-size: 11px; letter-spacing: .3em;
+               text-transform: uppercase; opacity: .5; }
+  .demo code { background: rgba(255,255,255,.08); padding: 2px 7px; border-radius: 5px; }
 </style>
 </head>
 <body>
 
-<!-- ══ Demo scaffolding: scroll runway before the webpart ══ -->
-<header class="demo-band">
-  <h1>Tiger prey</h1>
-  <p>Webpart rebuild demo — scroll down ↓ &nbsp;·&nbsp; append ?mode=faithful for the exact-original behaviour</p>
+<header class="demo">
+  <p class="kicker">WWF · Web technologies assignment</p>
+  <h1>Tiger&nbsp;prey</h1>
+  <p>Task&nbsp;1 — the second webpart, rebuilt. Same engine and stylesheet as the WordPress block.</p>
+  <p class="cue">Scroll ↓</p>
 </header>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     THE WEBPART — markup contract shared with the CMS block (render.php):
-     content in elements, behaviour config in data-* attributes.
-     data-mode: cinematic (default) | faithful
-     ════════════════════════════════════════════════════════════════════ -->
-<section class="scrollmap" id="tiger-range-map" data-scrollmap data-mode="cinematic" aria-label="Tiger range countries — scroll-driven map">
 
-  <div class="scrollmap__viewport">
-    <div class="scrollmap__stage">
-      <img class="scrollmap__map" src="assets/map.jpg"
-           width="2561" height="1224" fetchpriority="high"
-           alt="Stylised map of Asia titled 'Tiger range countries', showing tiger populations and trends per country. Full data follows this map as text.">
+<!-- ══════════════════════ THE WEBPART ══════════════════════ -->
+<section class="tgr"
+         data-tgr
+         data-focal="0 50"
+         data-paws="on" data-markers="on" data-rail="on"
+         aria-label="Tiger range countries — scroll-driven map">
 
-      <!-- Bonus hover hotspots over the baked-in labels (editable repeater in the CMS) -->
-      <button class="scrollmap__pin" style="left:84.5%; top:12.5%; width:11%; height:10%;" type="button">
-        <span class="tip"><strong>Russia</strong> 750 tigers, including cubs (2022) <em>Trend increasing ↑</em></span>
-        <span class="visually-hidden">Russia tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:53.5%; top:19.5%; width:12%; height:8%;" type="button">
-        <span class="tip"><strong>Kazakhstan</strong> 0 tigers (2023) <em>Tiger reintroduction location ◎</em></span>
-        <span class="visually-hidden">Kazakhstan tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:74.5%; top:19.5%; width:8.5%; height:8%;" type="button">
-        <span class="tip"><strong>China</strong> 60 tigers (2023) <em>Trend increasing ↑</em></span>
-        <span class="visually-hidden">China tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:58.5%; top:43.5%; width:7%; height:8%;" type="button">
-        <span class="tip"><strong>Nepal</strong> 355 tigers (2022) <em>Trend increasing ↑</em></span>
-        <span class="visually-hidden">Nepal tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:65.5%; top:43.5%; width:7.5%; height:8%;" type="button">
-        <span class="tip"><strong>Bhutan</strong> 131 tigers (2023) <em>Trend increasing ↑</em></span>
-        <span class="visually-hidden">Bhutan tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:51%; top:50.5%; width:7%; height:9%;" type="button">
-        <span class="tip"><strong>India</strong> 3,682 tigers (2023) <em>Trend increasing ↑</em></span>
-        <span class="visually-hidden">India tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:61%; top:54.5%; width:10%; height:7.5%;" type="button">
-        <span class="tip"><strong>Bangladesh</strong> 89–146 tigers (2018) <em>Trend not determined ○</em></span>
-        <span class="visually-hidden">Bangladesh tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:61.5%; top:64.5%; width:8.5%; height:9%;" type="button">
-        <span class="tip"><strong>Myanmar</strong> Minimum of 22 tigers (2018) <em>Trend not determined ○</em></span>
-        <span class="visually-hidden">Myanmar tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:71%; top:59.5%; width:9.5%; height:8%;" type="button">
-        <span class="tip"><strong>Thailand</strong> 179–223 tigers (2024) <em>Trend increasing ↑</em></span>
-        <span class="visually-hidden">Thailand tiger data</span>
-      </button>
-      <button class="scrollmap__pin" data-tip="left" style="left:86%; top:55%; width:9%; height:6.5%;" type="button">
-        <span class="tip"><strong>Lao PDR</strong> 0 wild tigers <em>Historic range</em></span>
-        <span class="visually-hidden">Lao PDR tiger data</span>
-      </button>
-      <button class="scrollmap__pin" data-tip="left" style="left:86%; top:63.5%; width:9%; height:6.5%;" type="button">
-        <span class="tip"><strong>Vietnam</strong> 0 wild tigers <em>Historic range</em></span>
-        <span class="visually-hidden">Vietnam tiger data</span>
-      </button>
-      <button class="scrollmap__pin" data-tip="left" style="left:86%; top:71.5%; width:9.5%; height:6.5%;" type="button">
-        <span class="tip"><strong>Cambodia</strong> 0 wild tigers <em>Historic range</em></span>
-        <span class="visually-hidden">Cambodia tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:70%; top:76.5%; width:9%; height:8%;" type="button">
-        <span class="tip"><strong>Malaysia</strong> Less than 150 tigers (2021) <em>Trend decreasing ↓</em></span>
-        <span class="visually-hidden">Malaysia tiger data</span>
-      </button>
-      <button class="scrollmap__pin" style="left:71%; top:86.5%; width:11%; height:8%;" type="button">
-        <span class="tip"><strong>Indonesia</strong> 400 tigers (2018) <em>Trend not determined ○</em></span>
-        <span class="visually-hidden">Indonesia tiger data</span>
-      </button>
-
-      <div class="scrollmap__frame" aria-hidden="true"></div>
+  <!-- The pinned visual stage. Markers, paw trail, chapter rail and the
+       spotlight's corner ticks are created by scrollmap.js, so the template
+       below stays pure content. -->
+  <div class="tgr__stage">
+    <div class="tgr__camera">
+      <img class="tgr__map" src="assets/map.jpg" width="2561" height="1224"
+           fetchpriority="high"
+           alt="Illustrated map of Asia titled Tiger Range Countries, showing each country's wild tiger population and whether the trend is increasing, stable, decreasing or undetermined. The full figures follow as a table.">
     </div>
-    <!-- progress rail is injected here by JS (cinematic mode) -->
+
+    <div class="tgr__grade" aria-hidden="true"></div>
+    <div class="tgr__frame" aria-hidden="true"></div>
+
+    <div class="tgr__chip" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+      <span class="tgr__chip-t"></span>
+    </div>
+
+    <div class="tgr__bar" aria-hidden="true"></div>
   </div>
 
-  <div class="scrollmap__points">
+  <!-- The cards. One .step per chapter; the order here is the scroll order. -->
+  <div class="tgr__steps">
 
-    <!-- 1 · intro — no hotspot: map fully bright -->
-    <article class="scrollmap__point" data-align="center" data-label="Intro">
-      <div class="card">
-        <p>We talk a lot about <em>tiger prey</em>, but what animals do tigers eat?</p>
-        <p>The most important tiger prey are often ungulates, which are mammals with hooves, such as large deer, wild cattle, and wild pigs. Let’s take a look at some of the places where tiger prey are found.</p>
+    <!-- 0 · opening ------------------------------------------------------ -->
+    <article class="step step--wide" data-side="right" data-label="Tiger range">
+      <div class="step__pin">
+        <div class="card">
+        <span class="eyebrow">Tiger range countries</span>
+        <p class="h2 title">
+          <span class="w"><span>What do</span></span>
+          <span class="w"><span>tigers eat?</span></span>
+        </p>
+        <p class="lede">We talk a lot about <em>tiger prey</em> — but what animals do tigers actually eat?</p>
+        <p class="lede">The most important tiger prey are ungulates: mammals with hooves, such as large deer, wild cattle and wild pigs. Scroll on to travel to some of the places where tiger prey are found.</p>
+        </div>
       </div>
     </article>
 
-    <!-- 2 · Sambar deer — India/Nepal -->
-    <article class="scrollmap__point" data-align="right"
+    <!-- 1 · Sambar deer -------------------------------------------------- -->
+    <article class="step" data-side="right" data-label="India &amp; Nepal" data-zoom="1"
              data-hotspot='{"x":48.5,"y":43,"w":17.1,"h":39.3}'>
-      <div class="card">
-        <h2>Sambar deer</h2>
-        <p>Sambar deer are one of the most important tiger prey species. They are often abundant in tiger reserves in India and Nepal. They can also be found across Southeast Asia but are much rarer in the region due to hunting. The IUCN lists sambar deer as Vulnerable.</p>
+      <div class="step__pin">
+        <div class="card">
+        <div class="card__meta"><span class="card__num">01</span><span class="card__region">India &amp; Nepal</span></div>
+        <p class="h2"><span class="w"><span>Sambar</span></span><span class="w"><span>deer</span></span></p>
+        <span class="card__status" data-level="vulnerable">IUCN · Vulnerable</span>
+        <p>Sambar deer are one of the most important tiger prey species. They are often abundant in tiger reserves in India and Nepal. They can also be found across Southeast Asia, but are much rarer there due to hunting.</p>
         <figure>
-          <img src="assets/sambar.jpg" loading="lazy" width="1400" height="890"
-               alt="A sambar deer foal standing beside its mother in dry grassland.">
+          <div class="card__shot">
+            <img src="assets/sambar.jpg" loading="lazy" width="1400" height="890"
+                 alt="A sambar deer foal resting its head against its mother in dry grassland.">
+          </div>
           <figcaption>Sambar foal and its mother in Ranthambore Tiger Reserve, India © Martin Harvey / WWF</figcaption>
         </figure>
+        </div>
       </div>
     </article>
 
-    <!-- 3 · Wild pig — Sumatra -->
-    <article class="scrollmap__point" data-align="left"
+    <!-- 2 · Wild pig ----------------------------------------------------- -->
+    <article class="step" data-side="left" data-label="Sumatra, Indonesia" data-zoom="1"
              data-hotspot='{"x":66.5,"y":79.4,"w":20,"h":20.6}'>
-      <div class="card">
-        <h2>Wild pig</h2>
-        <p>Wild pigs are the most widely distributed tiger prey species and can be commonly found across Asia and occur in every landscape in which tigers are found. On the island of Sumatra (Indonesia) they are one of the most important tiger prey species. Female wild pig can have up to two litters of piglets per year, with 4-8 piglets per litter.</p>
+      <div class="step__pin">
+        <div class="card">
+        <div class="card__meta"><span class="card__num">02</span><span class="card__region">Sumatra, Indonesia</span></div>
+        <p class="h2"><span class="w"><span>Wild pig</span></span></p>
+        <span class="card__status" data-level="least">IUCN · Least concern</span>
+        <p>Wild pigs are the most widely distributed tiger prey species, occurring in every landscape in which tigers are found. On Sumatra they are one of the most important prey species of all. A female can have up to two litters a year, of four to eight piglets each.</p>
         <figure>
-          <img src="assets/wildpig.jpg" loading="lazy" width="1400" height="933"
-               alt="A wild boar walking through forest undergrowth.">
-          <figcaption>Wild boar have brown fur that provides excellent camouflage in the forest. © Ola Jennersten / WWF-Sweden</figcaption>
+          <div class="card__shot">
+            <img src="assets/wildpig.jpg" loading="lazy" width="1400" height="933"
+                 alt="A wild boar and three striped piglets walking across bare forest floor.">
+          </div>
+          <figcaption>Wild boar have brown fur that provides excellent camouflage in the forest © Ola Jennersten / WWF-Sweden</figcaption>
         </figure>
+        </div>
       </div>
     </article>
 
-    <!-- 4 · Banteng — Thailand -->
-    <article class="scrollmap__point" data-align="right"
+    <!-- 3 · Banteng ------------------------------------------------------ -->
+    <article class="step" data-side="right" data-label="Thailand" data-zoom="1"
              data-hotspot='{"x":66.2,"y":55.5,"w":14,"h":18.3}'>
-      <div class="card">
-        <h2>Banteng</h2>
-        <p>One of the larger tiger prey species is the banteng, these are large wild cattle and are classified as Endangered by the IUCN. Historic hunting and a current snaring crisis in Southeast Asia have caused a decline in their populations. In Thailand, there are signs of hope with populations increasing.</p>
+      <div class="step__pin">
+        <div class="card">
+        <div class="card__meta"><span class="card__num">03</span><span class="card__region">Thailand</span></div>
+        <p class="h2"><span class="w"><span>Banteng</span></span></p>
+        <span class="card__status" data-level="endangered">IUCN · Endangered</span>
+        <p>One of the largest tiger prey species: banteng are wild cattle, classified as Endangered. Historic hunting and a current snaring crisis across Southeast Asia have driven their populations down — but in Thailand there are signs of hope.</p>
+        <p>A <a href="https://www.sciencedirect.com/science/article/pii/S2351989424002166" target="_blank" rel="noopener">recently published paper</a> showed banteng in Huai Kha Khaeng have doubled in 15 years, on the back of strong law enforcement and long-term investment in protecting a source tiger site.</p>
         <figure>
-          <img src="assets/banteng.jpg" loading="lazy" width="1200" height="803"
-               alt="A male banteng, a large brown wild ox, standing in forest clearing.">
-          <figcaption>A male banteng photographed in Kuiburi National Park, Thailand. © Wayuphong Jitvijak / WWF-Greater Mekong</figcaption>
+          <div class="card__shot">
+            <img src="assets/banteng.jpg" loading="lazy" width="1200" height="803"
+                 alt="A male banteng, a large dark wild ox with white stockings, standing in a forest clearing.">
+          </div>
+          <figcaption>A male banteng in Kuiburi National Park, Thailand © Wayuphong Jitvijak / WWF-Greater Mekong</figcaption>
         </figure>
-        <p>A <a href="https://www.sciencedirect.com/science/article/pii/S2351989424002166" target="_blank" rel="noopener">recently published paper</a> showed that banteng populations in Huai Kha Khaeng, in the core of Thailand’s Western Forest Complex and the most important site for tigers in Southeast Asia, have doubled in the past 15 years. This is a result of strong law enforcement and a long-term investment into protection of a source tiger site.</p>
+        </div>
       </div>
     </article>
 
-    <!-- 5 · Bukhara deer — Kazakhstan -->
-    <article class="scrollmap__point" data-align="right"
+    <!-- 4 · Bukhara deer ------------------------------------------------- -->
+    <article class="step" data-side="left" data-label="Kazakhstan" data-zoom="1"
              data-hotspot='{"x":52,"y":16,"w":15.5,"h":20}'>
-      <div class="card">
-        <h2>Bukhara deer</h2>
-        <p>In Central Asia a different set of species are important for tiger prey including bukhara deer. This is the Central Asian subspecies of the widespread red deer and populations are increasing thanks to conservation efforts. Restoring healthy bukhara deer numbers will be key to the success of a landmark tiger reintroduction project in the country. Tigers became extinct in Kazakhstan over 70 years ago and are planned to be reintroduced in the next few years.</p>
+      <div class="step__pin">
+        <div class="card">
+        <div class="card__meta"><span class="card__num">04</span><span class="card__region">Kazakhstan</span></div>
+        <p class="h2"><span class="w"><span>Bukhara</span></span><span class="w"><span>deer</span></span></p>
+        <span class="card__status">Central Asian red deer</span>
+        <p>In Central Asia a different set of species matters. Bukhara deer — the Central Asian subspecies of red deer — are increasing thanks to conservation work. Restoring healthy numbers is key to a landmark reintroduction: tigers went extinct in Kazakhstan over 70 years ago, and are planned to return within a few years.</p>
         <figure>
-          <img src="assets/bukhara.jpg" loading="lazy" width="1400" height="841"
-               alt="A herd of bukhara deer running across an open plain after release.">
-          <figcaption>Newly released bukhara deer, Kazakhstan. © WWF</figcaption>
+          <div class="card__shot">
+            <img src="assets/bukhara.jpg" loading="lazy" width="1400" height="841"
+                 alt="A herd of bukhara deer moving across dry open plain after release.">
+          </div>
+          <figcaption>Newly released bukhara deer, Kazakhstan © WWF</figcaption>
         </figure>
+        </div>
       </div>
     </article>
 
-    <!-- 6 · Nilgai — India -->
-    <article class="scrollmap__point" data-align="right"
+    <!-- 5 · Nilgai ------------------------------------------------------- -->
+    <article class="step" data-side="right" data-label="India" data-zoom="1"
              data-hotspot='{"x":46.2,"y":42,"w":17.7,"h":33.9}'>
-      <div class="card">
-        <h2>Nilgai</h2>
-        <p>Commonly found in India, Nilgai are the largest antelope found in Asia. Their thin legs, large torso, wide neck, and small head make them unique. Mostly found in India and some parts of Nepal, this tiger prey weighs in at roughly 100-288 kg depending whether it’s male or female.</p>
+      <div class="step__pin">
+        <div class="card">
+        <div class="card__meta"><span class="card__num">05</span><span class="card__region">India</span></div>
+        <p class="h2"><span class="w"><span>Nilgai</span></span></p>
+        <span class="card__status" data-level="least">IUCN · Least concern</span>
+        <p>Nilgai are the largest antelope in Asia. Thin legs, a large torso, a wide neck and a small head make them unmistakable. Found mostly in India and parts of Nepal, they weigh roughly 100–288&nbsp;kg depending on sex.</p>
         <figure>
-          <img src="assets/nilgai.jpg" loading="lazy" width="1400" height="933"
-               alt="A nilgai antelope standing alert in golden grassland.">
-          <figcaption>Nilgai spotted in Ranthambore Tiger Reserve, India. © Ola Jennersten / WWF-Sweden</figcaption>
+          <div class="card__shot">
+            <img src="assets/nilgai.jpg" loading="lazy" width="1400" height="933"
+                 alt="A nilgai antelope standing alert in golden grassland.">
+          </div>
+          <figcaption>Nilgai in Ranthambore Tiger Reserve, India © Ola Jennersten / WWF-Sweden</figcaption>
         </figure>
+        </div>
       </div>
     </article>
 
-    <!-- 7 · Chital — India/Nepal/Bangladesh -->
-    <article class="scrollmap__point" data-align="left"
+    <!-- 6 · Chital ------------------------------------------------------- -->
+    <article class="step" data-side="left" data-label="Nepal &amp; India" data-zoom="1"
              data-hotspot='{"x":56.4,"y":40.7,"w":11.4,"h":14.8}'>
-      <div class="card">
-        <h2>Chital</h2>
-        <p>Also known as spotted deer, chital are an important and abundant prey species for tigers in India and Nepal. They can also be found in Bangladesh and Bhutan and are listed as Least Concern by the IUCN.</p>
+      <div class="step__pin">
+        <div class="card">
+        <div class="card__meta"><span class="card__num">06</span><span class="card__region">Nepal &amp; India</span></div>
+        <p class="h2"><span class="w"><span>Chital</span></span></p>
+        <span class="card__status" data-level="least">IUCN · Least concern</span>
+        <p>Also known as spotted deer, chital are an important and abundant prey species for tigers in India and Nepal. They are also found in Bangladesh and Bhutan.</p>
         <figure>
-          <img src="assets/chital.jpg" loading="lazy" width="1400" height="1078"
-               alt="A chital, or spotted deer, captured on a night camera trap.">
-          <figcaption>Chital recorded on camera traps set up to monitor wildlife in the Khata Corridor, Nepal. © DoFSC / WWF Nepal</figcaption>
+          <div class="card__shot">
+            <img src="assets/chital.jpg" loading="lazy" width="1400" height="1078"
+                 alt="A chital, or spotted deer, caught on a night-time camera trap.">
+          </div>
+          <figcaption>Chital on a camera trap in the Khata Corridor, Nepal © DoFSC / WWF Nepal</figcaption>
         </figure>
+        </div>
       </div>
     </article>
 
-    <!-- 8 · outro — no hotspot: camera glides home, dim lifts -->
-    <article class="scrollmap__point" data-align="center" data-label="Outro">
-      <div class="card">
-        <p>These are just a few examples of the many tiger prey species, other important ungulates for tigers in parts of their range include gaur, roe deer, sika deer, hog deer, muntjac, barasingha, and eld’s deer.</p>
+    <!-- 7 · closing ------------------------------------------------------ -->
+    <article class="step step--wide" data-side="left" data-label="And many more">
+      <div class="step__pin">
+        <div class="card">
+        <span class="eyebrow">And many more</span>
+        <p class="h2 title"><span class="w"><span>Six of many</span></span></p>
+        <p class="lede">These are just a few of the many tiger prey species. Other important ungulates across the tiger's range include gaur, roe deer, sika deer, hog deer, muntjac, barasingha and eld's deer.</p>
+        </div>
       </div>
     </article>
 
   </div>
 
-  <!-- Accessible alternative for the data baked into the map artwork -->
-  <table class="visually-hidden">
-    <caption>Tiger range countries: population and trend</caption>
+  <!-- The map's data is baked into the artwork as pixels, so it is invisible
+       to screen readers — the original ships alt="". This table fixes that. -->
+  <table class="tgr__sr">
+    <caption>Tiger range countries: wild tiger population and trend</caption>
     <thead><tr><th>Country</th><th>Wild tigers</th><th>Survey year</th><th>Trend</th></tr></thead>
     <tbody>
       <tr><td>Russia</td><td>750 (including cubs)</td><td>2022</td><td>Increasing</td></tr>
@@ -558,283 +273,21 @@ html:not(.js) .card > * { opacity: 1; transform: none; }
       <tr><td>Lao PDR</td><td>0 wild tigers</td><td>—</td><td>Historic range</td></tr>
       <tr><td>Vietnam</td><td>0 wild tigers</td><td>—</td><td>Historic range</td></tr>
       <tr><td>Cambodia</td><td>0 wild tigers</td><td>—</td><td>Historic range</td></tr>
-      <tr><td>Malaysia</td><td>Less than 150</td><td>2021</td><td>Decreasing</td></tr>
+      <tr><td>Malaysia</td><td>Fewer than 150</td><td>2021</td><td>Decreasing</td></tr>
       <tr><td>Indonesia</td><td>400</td><td>2018</td><td>Not determined</td></tr>
     </tbody>
   </table>
 </section>
+<!-- ════════════════════ END OF THE WEBPART ════════════════════ -->
 
-<!-- ══ Demo scaffolding after the webpart ══ -->
-<footer class="demo-band">
+
+<footer class="demo">
   <h1>End of webpart</h1>
-  <p>Rebuilt for the WWF web technologies assignment — Task 1.</p>
+  <p>Task&nbsp;2 — the same component as an editable WordPress block: <code>src/wp-plugin</code></p>
 </footer>
 
-<script>
-/* ===========================================================================
-   Scroll engine v2 — zero dependencies.
-
-   Modes per instance (data-mode attr, overridable with ?mode=):
-     cinematic — spring-driven camera (desktop push-in + mobile fly-to),
-                 spring-driven spotlight, arrival pulse, progress rail.
-     faithful  — the original's exact behaviour: CSS 0.8s spotlight travel,
-                 no desktop zoom (mobile camera still applies, CSS-eased).
-
-   The spring is exponential smoothing:  v += (target − v)·(1 − e^(−rate·dt))
-   — frame-rate independent, naturally interruptible (a new target simply
-   redirects the curve, no restart), and the rAF loop suspends itself when
-   every value settles within epsilon: zero cost while the user reads.
-   ======================================================================== */
-(function () {
-  'use strict';
-  document.documentElement.classList.add('js');
-
-  var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
-  var MOBILE  = window.matchMedia('(max-width: 899px)');
-  var URL_MODE = null;
-  try { URL_MODE = new URLSearchParams(location.search).get('mode'); } catch (e) {}
-
-  document.querySelectorAll('[data-scrollmap]').forEach(initScrollmap);
-
-  function initScrollmap(root) {
-    if (root.dataset.scrollmapReady) return;
-    root.dataset.scrollmapReady = '1';
-
-    var viewport = root.querySelector('.scrollmap__viewport');
-    var stage    = root.querySelector('.scrollmap__stage');
-    var mapImg   = root.querySelector('.scrollmap__map');
-    var frame    = root.querySelector('.scrollmap__frame');
-    var points   = Array.prototype.slice.call(root.querySelectorAll('.scrollmap__point'));
-    if (!viewport || !stage || !mapImg || !frame || !points.length) return;
-
-    var mode = URL_MODE || root.dataset.mode || 'cinematic';
-    var cinematic = mode !== 'faithful' && !REDUCED.matches;
-    root.classList.toggle('scrollmap--cinematic', cinematic);
-
-    var layout = null;   // stage cover geometry {vw,vh,w,h,x,y}
-    var active = -1;
-
-    /* ---- geometry ----------------------------------------------------- */
-    function layoutStage() {
-      var vw = viewport.clientWidth, vh = viewport.clientHeight;
-      var iw = mapImg.naturalWidth  || 2561;
-      var ih = mapImg.naturalHeight || 1224;
-      var s  = Math.max(vw / iw, vh / ih);
-      var w  = iw * s, h = ih * s;
-      var x  = (vw - w) / 2, y = (vh - h) / 2;
-      layout = { vw: vw, vh: vh, w: w, h: h, x: x, y: y };
-      stage.style.width  = w + 'px';
-      stage.style.height = h + 'px';
-      stage.style.left   = x + 'px';
-      stage.style.top    = y + 'px';
-      retarget();                      // camera targets depend on geometry
-    }
-
-    function hotspotOf(point) {
-      if (!point || !point.dataset.hotspot) return null;
-      try { return JSON.parse(point.dataset.hotspot); } catch (e) { return null; }
-    }
-    function alignOf(point) { return (point && point.dataset.align) || 'center'; }
-
-    /* ---- camera target -------------------------------------------------
-       transform-origin is 0 0, so a stage-local point p renders at
-       stagePos + t + k·p. Solve t so the hotspot centre lands on the focal
-       point; clamp so the scaled stage always covers the viewport.        */
-    function cameraFor(spot, align) {
-      if (!layout || !spot) return { x: 0, y: 0, k: 1 };
-      var L = layout;
-      var bw = spot.w / 100 * L.w, bh = spot.h / 100 * L.h;
-      var cx = (spot.x + spot.w / 2) / 100 * L.w;
-      var cy = (spot.y + spot.h / 2) / 100 * L.h;
-      var k, fx, fy;
-      if (MOBILE.matches) {
-        k  = Math.min(0.9 * L.vw / bw, 0.55 * L.vh / bh);
-        k  = Math.max(1, Math.min(k, 2.6));
-        fx = L.vw * 0.5;
-        fy = L.vh * 0.38;              /* card slides in below */
-      } else {
-        /* desktop push-in: modest zoom, focal biased AWAY from the card
-           column so the spotlighted region never hides behind the card   */
-        k  = Math.min(0.55 * L.vw / bw, 0.6 * L.vh / bh);
-        k  = Math.max(1.06, Math.min(k, 1.45));
-        fx = L.vw * (align === 'right' ? 0.36 : align === 'left' ? 0.64 : 0.5);
-        fy = L.vh * 0.5;
-      }
-      var tx = fx - k * cx - L.x;
-      var ty = fy - k * cy - L.y;
-      tx = Math.min(Math.max(tx, L.vw - L.x - k * L.w), -L.x);
-      ty = Math.min(Math.max(ty, L.vh - L.y - k * L.h), -L.y);
-      return { x: tx, y: ty, k: k };
-    }
-
-    /* ---- spring system (cinematic) ------------------------------------ */
-    var cur = { cx: 0, cy: 0, ck: 1, fx: 40, fy: 40, fw: 20, fh: 20, fo: 0 };
-    var tgt = { cx: 0, cy: 0, ck: 1, fx: 40, fy: 40, fw: 20, fh: 20, fo: 0 };
-    var RATE = { c: 3.4, f: 5.2, o: 6 };          /* 1/s — settle ≈ 0.9/0.6s */
-    var rafId = 0, lastT = 0, stepCount = 0, watchdog = 0;
-
-    function springStart() {
-      if (!rafId) { lastT = performance.now(); rafId = requestAnimationFrame(springStep); }
-      /* rAF can be starved (hidden/prerendered pages, headless capture):
-         if no frame ran shortly after a retarget, snap to the target so the
-         page is never stuck mid-animation. Real browsers never hit this.   */
-      clearTimeout(watchdog);
-      var seen = stepCount;
-      watchdog = setTimeout(function () {
-        if (stepCount === seen) {
-          for (var k in tgt) cur[k] = tgt[k];
-          render();
-        }
-      }, 250);
-    }
-    function springStep(now) {
-      stepCount++;
-      var dt = (now - lastT) / 1000;
-      lastT = now;
-      if (!(dt > 0)) dt = 1 / 60;      /* guard zero/negative/NaN timestamps */
-      dt = Math.min(dt, 0.05);         /* clamp tab-switch jumps              */
-      var settled = true;
-      for (var key in tgt) {
-        var rate = key === 'fo' ? RATE.o : key[0] === 'c' ? RATE.c : RATE.f;
-        var next = cur[key] + (tgt[key] - cur[key]) * (1 - Math.exp(-rate * dt));
-        if (Math.abs(tgt[key] - next) > (key === 'ck' || key === 'fo' ? 0.001 : 0.05)) settled = false;
-        else next = tgt[key];
-        cur[key] = next;
-      }
-      render();
-      rafId = settled ? 0 : requestAnimationFrame(springStep);
-    }
-    function render() {
-      stage.style.transform = (cur.ck === 1 && cur.cx === 0 && cur.cy === 0)
-        ? '' : 'translate(' + cur.cx + 'px,' + cur.cy + 'px) scale(' + cur.ck + ')';
-      frame.style.left    = cur.fx + '%';
-      frame.style.top     = cur.fy + '%';
-      frame.style.width   = cur.fw + '%';
-      frame.style.height  = cur.fh + '%';
-      frame.style.opacity = cur.fo;
-    }
-    function pulse() {
-      frame.classList.remove('is-arrive');
-      void frame.offsetWidth;                       /* restart the keyframe */
-      frame.classList.add('is-arrive');
-    }
-
-    /* Cinematic target setter — interruptible by design: scrolling mid-
-       flight just replaces tgt and the springs bend toward it.            */
-    function setCinematicTargets(spot, align) {
-      var cam = cameraFor(spot, align);
-      tgt.cx = cam.x; tgt.cy = cam.y; tgt.ck = cam.k;
-      if (spot) {
-        if (cur.fo < 0.02) {                        /* appear in place      */
-          cur.fx = spot.x; cur.fy = spot.y; cur.fw = spot.w; cur.fh = spot.h;
-        }
-        tgt.fx = spot.x; tgt.fy = spot.y; tgt.fw = spot.w; tgt.fh = spot.h;
-        tgt.fo = 1;
-        pulse();
-      } else {
-        tgt.fo = 0;
-      }
-      springStart();
-    }
-
-    /* ---- faithful mode: the original's CSS-transition behaviour ------- */
-    function moveFrameFaithful(spot) {
-      if (!spot) { frame.classList.remove('is-active'); return; }
-      var wasHidden = !frame.classList.contains('is-active');
-      if (wasHidden) {
-        frame.style.transition = 'none';
-        setFrameBox(spot);
-        void frame.offsetWidth;
-        frame.style.transition = '';
-      } else {
-        setFrameBox(spot);
-      }
-      frame.classList.add('is-active');
-    }
-    function setFrameBox(spot) {
-      frame.style.left   = spot.x + '%';
-      frame.style.top    = spot.y + '%';
-      frame.style.width  = spot.w + '%';
-      frame.style.height = spot.h + '%';
-    }
-    function applyCameraFaithful(spot) {
-      if (!layout) return;
-      if (!MOBILE.matches || !spot) { stage.style.transform = ''; return; }
-      var cam = cameraFor(spot, 'center');
-      stage.style.transform = 'translate(' + cam.x + 'px,' + cam.y + 'px) scale(' + cam.k + ')';
-    }
-
-    /* ---- shared retarget (called on activate + resize) ----------------- */
-    function retarget() {
-      var point = points[active];
-      var spot  = hotspotOf(point);
-      if (cinematic) {
-        setCinematicTargets(spot, alignOf(point));
-      } else {
-        moveFrameFaithful(spot);
-        applyCameraFaithful(spot);
-      }
-    }
-
-    /* ---- activation band ------------------------------------------------ */
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) activate(points.indexOf(entry.target));
-      });
-    }, { rootMargin: '-42% 0px -42% 0px', threshold: 0 });
-    points.forEach(function (p) { io.observe(p); });
-
-    function activate(i) {
-      if (i === active) return;
-      active = i;
-      points.forEach(function (p, j) { p.classList.toggle('is-active', j === i); });
-      railDots.forEach(function (d, j) { d.setAttribute('aria-current', j === i ? 'true' : 'false'); });
-      retarget();
-    }
-
-    /* ---- progress rail (cinematic desktop) ------------------------------ */
-    var railDots = [];
-    if (cinematic) {
-      var rail = document.createElement('nav');
-      rail.className = 'scrollmap__rail';
-      rail.setAttribute('aria-label', 'Map story progress');
-      points.forEach(function (p, i) {
-        var label = p.dataset.label
-          || (p.querySelector('h2') ? p.querySelector('h2').textContent : 'Point ' + (i + 1));
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.setAttribute('aria-current', 'false');
-        b.innerHTML = '<span class="lbl"></span><span class="visually-hidden"></span>';
-        b.querySelector('.lbl').textContent = label;
-        b.querySelector('.visually-hidden').textContent = 'Go to: ' + label;
-        b.addEventListener('click', function () {
-          var card = p.querySelector('.card') || p;
-          card.scrollIntoView({ behavior: REDUCED.matches ? 'auto' : 'smooth', block: 'center' });
-        });
-        rail.appendChild(b);
-        railDots.push(b);
-      });
-      viewport.appendChild(rail);
-    }
-
-    /* ---- card reveal ------------------------------------------------------ */
-    var reveal = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        entry.target.classList.toggle('is-revealed', entry.isIntersecting);
-      });
-    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
-    points.forEach(function (p) {
-      var card = p.querySelector('.card');
-      if (card) reveal.observe(card);
-    });
-
-    /* ---- resize / orientation / URL-bar / breakpoint --------------------- */
-    if (mapImg.complete && mapImg.naturalWidth) layoutStage();
-    else mapImg.addEventListener('load', layoutStage);
-    new ResizeObserver(layoutStage).observe(viewport);
-    MOBILE.addEventListener('change', function () { layoutStage(); });
-  }
-})();
-</script>
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script src="scrollmap.js"></script>
 </body>
 </html>

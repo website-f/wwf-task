@@ -17,27 +17,37 @@ Media Library attachment IDs (not URLs) so renditions/alt come from the library.
 
 ```jsonc
 {
-  "sectionTitle": "Tiger range countries",        // admin label + aria-label
-  "theme": "light",                               // light | dark
-  "backgroundImage": { "id": 123, "alt": "…" },   // REQUIRED — desktop map
-  "mobileImage":     { "id": 124, "alt": "…" },   // optional portrait crop; fallback: crop desktop
-  "dimColor": "#000000",
-  "dimOpacity": 0.5,
-  "highlight": { "borderColor": "#2a6788", "borderWidth": 4, "transitionMs": 800 },
-  "cardOpacity": 0.85,
-  "points": [                                     // ordered — order == scroll order
+  // ---- the map --------------------------------------------------------
+  "sectionTitle": "Tiger range countries",      // REQUIRED, screen-reader <h2> + aria-label
+  "backgroundImage": { "id": 4, "url": "…", "alt": "…" },  // REQUIRED, media-library ID
+  "focalX": 0, "focalY": 50,                    // % — which part survives the cover crop
+
+  // ---- motion (editor switches) ---------------------------------------
+  "showPaws": true, "showMarkers": true, "showRail": true,
+
+  // ---- design tokens --------------------------------------------------
+  "accentColor": "#8fd14f", "inkColor": "#f2efe6",
+  "backdropColor": "#04140d", "cardColor": "#071a11",
+  "dimOpacity": 0.62, "cardOpacity": 0.84,
+
+  // ---- the story: ordered, order == scroll order -----------------------
+  "points": [
     {
-      "id": "uuid-1",                             // stable key for React + anchors
-      "align": "center",                          // left | center | right
-      "heading": "",                              // optional (intro has none)
-      "body": "<p>We talk a lot about…</p>",      // RichText (limited: p/em/strong/a)
-      "image": { "id": 201, "alt": "…", "caption": "Sambar foal… © Martin Harvey / WWF" },
-      "hotspot": {                                // null → no spotlight (full-bright)
-        "x": 48.5, "y": 43.0, "w": 17.1, "h": 39.3,   // % of image, 0–100
-        "dot": null                               // optional {x, y} marker
-      }
+      "id": "pt-sambar",          // stable key: survives reordering
+      "wide": false,              // true = wide establishing shot, no region
+      "side": "right",            // which half the CARD occupies; region flies to the other
+      "label": "India & Nepal",   // region badge + chapter rail
+      "number": "01",
+      "heading": "Sambar\ndeer",  // newlines = masked reveal lines
+      "status": "IUCN · Vulnerable",
+      "statusLevel": "vulnerable",// '' | least | vulnerable | endangered → chip colour
+      "body": "<p>…</p>",         // RichText, kses-limited to p/br/em/strong/u/a
+      "image": { "id": 5, "url": "…", "alt": "…" },
+      "caption": "… © Martin Harvey / WWF",
+      "zoom": 1,                  // how hard the camera pushes in
+      "hotspot": { "x": 48.5, "y": 43, "w": 17.1, "h": 39.3 }   // % of the image, or null
     }
-    // …more points
+    // …more chapters
   ]
 }
 ```
@@ -49,6 +59,24 @@ Design decisions to defend:
   between pages, works in patterns); a CPT would be right only if the same map were reused
   across many pages — mention as a variation ("Reusable block / pattern" already covers it).
 - **IDs on points** → stable reordering, no key collisions.
+
+### 1a. What is built vs what is planned
+
+Everything in the model above is implemented and running at `localhost:8280`. Two things in
+this plan are deliberately *not* built, and I would rather name them than let them be found:
+
+| Plan item | Status |
+|---|---|
+| Every attribute above, incl. focal point, the three motion switches and four colours | ✅ built (`block.json`) |
+| Draw / move / resize a region on the map; numeric fields in sync; clamped on both sides | ✅ built (`editor.js`, verified with scripted mouse events) |
+| Chapters: add (map or text), reorder, duplicate, remove | ✅ built — **↑ ↓ buttons**, not a drag handle |
+| Validation: hard rules lock Publish with reasons; soft a11y warnings never block | ✅ built |
+| Live card preview with inline heading / status / rich body | ✅ built |
+| Layout guide showing where region and card will land | ✅ built |
+| Preview before publish | ✅ native WordPress draft preview + device toggles |
+| Server render sharing the Task 1 markup, stylesheet and engine | ✅ built |
+| Separate portrait `mobileImage` | ⛔ not built — the phone layout flies the one map inside a 45vh window instead, so editors enter content once. A `mobileImage` field is the refinement if art direction ever demands it |
+| Drag-handle reordering | ⛔ not built — ↑↓ is keyboard- and screen-reader-accessible with no extra work; drag-and-drop is not |
 
 ## 2. Editor experience (what the editor sees)
 
@@ -68,30 +96,45 @@ keywords (`map`, `scrollytelling`, `hotspot`) registered in `block.json`.
 
 ### Sidebar (InspectorControls)
 ```
+▸ Fix before publishing            ← only appears when something is blocking
+▸ Accessibility                    ← soft warnings (missing alt text)
 ▸ Map
-   [Background image]  [Mobile image]  (MediaUpload buttons + previews)
-   Dim opacity  ── slider 0–1 (default .5)
-   Highlight color / border / speed
-▸ Points (8)                       ← repeater list
-   ┌──────────────────────────────┐
-   │ ⠿ 1  Intro          ⬆ ⬇ 🗑  │   ⠿ drag-handle reorder (or ⬆⬇ buttons)
-   │ ⠿ 2  Sambar deer    ⬆ ⬇ 🗑  │   click row → selects point, canvas
-   │ …                            │   scrolls to its card + shows its box
-   └──────────────────────────────┘
-   [+ Add point]
-▸ Selected point
-   Heading [___________]
-   Body    [RichText]
-   Image   [MediaUpload]  Caption [____]
-   Align   (◉ left  ○ center  ○ right)
-   Hotspot [x] enabled → x/y/w/h numeric inputs + "Draw on map" button
+   [map thumbnail]  [Replace map image]
+   Section title  [__________________]   (required)
+   Framing — horizontal  ──●────  0      (0 = keep the left edge)
+   Framing — vertical    ────●──  50
+▸ Motion
+   [x] Paw-print trail between chapters
+   [x] Numbered pins on the map
+   [x] Chapter rail along the bottom
+▸ Colours
+   Accent / Text / Backdrop / Card  (brand palette + custom)
+   Dim outside the region  ─────●──
+   Card opacity            ──────●─
+▸ Chapters (8)
+   ┌────────────────────────────────────┐
+   │ ① What do tigers eat?  TEXT ↑↓⧉🗑 │  click a row → selects it
+   │ ② Sambar deer          MAP  ↑↓⧉🗑 │  red outline = missing text
+   │ …                                  │
+   └────────────────────────────────────┘
+   [+ Map chapter] [+ Text chapter]
+▸ Chapter 2
+   Chapter type  (Map chapter ▾)
+   Card side     (Card right · map left ▾)
+   Region label  [India & Nepal]     Number [01]
+   Status chip colour (Vulnerable ▾)
+   [Add photo]  Caption [__________]
+   ── [Draw the region on the map] ──
+   Zoom strength ────●──
+   X 48.5   Y 43     W 17.1   H 39.3
 ```
 
 ### Edit / Reorder / Remove hotspots — explicitly required by the brief
 - **Add**: `+ Add point` appends with sensible defaults (center, no hotspot).
 - **Edit**: select row → edit fields / redraw box on canvas.
-- **Reorder**: drag handle (or up/down buttons — implemented with simple array
-  splice on the attributes; both shown in demo).
+- **Reorder**: up/down buttons (immutable array swap on the attribute). A drag handle is
+  the obvious next step; ↑↓ was chosen because it is keyboard- and screen-reader-accessible
+  out of the box, which drag-and-drop is not without extra work.
 - **Remove**: trash icon with confirm; deletion only affects the array, media stays
   in the library.
 
@@ -107,26 +150,31 @@ Native WordPress flow — no custom work needed, but demo it explicitly:
 - **Server-side render** (`render.php` registered in `block.json`): PHP receives the
   attributes and outputs the exact same semantic markup as the standalone Task 1 file.
   SEO-friendly, no client-side hydration needed, works with caching/CDN.
-- Front-end assets: one small CSS + one small JS (IntersectionObserver engine),
-  enqueued **once** per page regardless of how many instances (`viewScript` handles
-  this automatically); the JS boots every `.wwf-scrollmap` on the page independently
-  → multiple instances per page supported.
-- Data reaches JS via `data-*` attributes / an inline `<script type="application/json">`
-  per instance — no REST round-trip on the front end.
+- Front-end assets: one stylesheet and one engine, enqueued **once** per page however many
+  instances (`viewScript` handles that), plus GSAP + ScrollTrigger **vendored in the plugin**
+  and registered as ordinary WordPress script handles — no CDN in the runtime path, version
+  pinned by the deploy, and deduplicated if another plugin also wants GSAP. The engine boots
+  every `[data-tgr]` section independently, so several blocks per page work.
+- Data reaches JS via `data-*` attributes (`data-focal`, `data-paws/markers/rail`, and per
+  chapter `data-side`, `data-zoom`, `data-label`, `data-hotspot='{"x":…,"y":…,"w":…,"h":…}'`)
+  — no REST round-trip, and the identical contract the standalone Task 1 file uses.
+- Design tokens go out as inline CSS custom properties on the section, so per-instance
+  theming needs no extra stylesheet.
 - Images: `wp_get_attachment_image()` → automatic `srcset`/`sizes`, lazy-loading,
   alt text from the media library.
-- Renders correctly (static, first point visible, no spotlight) if JS fails —
-  progressive enhancement.
+- If JS fails or GSAP doesn't load, `.tgr:not(.is-ready)` undoes the sticky overlay: the map
+  renders statically with readable cards stacked beneath it. Content first.
 
 ## 4. Validation (enforced in editor + on save)
 
 | Rule | Where | Behavior |
 |---|---|---|
 | Background image required | editor | placeholder state until set; publish blocked with notice |
-| ≥ 1 point required | editor | "Add at least one point" inline warning |
-| Point needs heading OR body | editor | row flagged red in the repeater |
+| Section title required | editor | publish blocked; inline warning under the field |
+| ≥ 1 point required | editor | publish blocked; "Add at least one point" inline notice |
+| Point needs heading OR body | editor | publish blocked; the offending row is flagged red in the repeater with "— needs text" |
 | Hotspot bounds 0 ≤ x,y ≤ 100, x+w ≤ 100, y+h ≤ 100 | input + `useEffect` clamp | values clamped live; can't draw outside image |
-| Alt text present on images | editor | warning (soft — a11y nudge, mirrors WP core) |
+| Alt text present on map + card images | editor | soft warning list in the sidebar — never blocks publish (an a11y nudge, mirroring WP core's behaviour) |
 | Rich text sanitization | save + server | allowed tags only (`p em strong a u`), `esc_url` on links, `wp_kses` on render — no script injection via content |
 | Colors valid hex, opacity 0–1 | control types enforce | n/a |
 
@@ -137,18 +185,22 @@ soft rules only warn.
 
 - Same breakpoints as the rebuild: <620 / 620 / 900 / 1100.
 - ≥900px: pinned map + traveling spotlight (desktop behavior).
-- <900px: `mobileImage` (portrait) if provided, else the desktop map `object-fit:cover`
-  center-crop; cards full-width (12 col), spotlight replaced by full-bright map — matching
-  the original's mobile variant. One component, CSS switch — **not** two content entries
-  (editors enter content once; the original's duplicated desktop/mobile sections are a
-  Shorthand artifact we improve on).
+- **<900px the layout changes shape, not just size.** The stage becomes a **45vh map window
+  stuck to the top** of the screen, and the cards are **pinned** in the 55vh beneath it,
+  sliding in sideways like a carousel — in from the right, out to the left. 45 + 55 = 100: the
+  map and the cards are two separate boxes that add up to the screen, so the card cannot reach
+  the map. The camera still flies and zooms inside that window, driven by the same hotspot
+  data. One component, one content entry, **not** the original's duplicated hand-cropped
+  portrait section.
+- The breakpoint is a `gsap.matchMedia()` context: crossing 900px reverts one set of
+  ScrollTriggers and builds the other, with no stale state left behind.
 - Editor preview toggles (desktop/tablet/mobile) show both modes before publish.
 
 ## 6. Reusability
 
 - Distributed as a **plugin**, not theme code → survives theme switches, installable
   on any WP site.
-- All colors/spacings are CSS custom properties scoped to `.wwf-scrollmap` →
+- All colors/spacings are CSS custom properties scoped to the `.scrollmap` section →
   themable per instance from block settings without touching CSS.
 - Multiple instances per page; works inside patterns and reusable blocks
   (synced patterns) for org-wide reuse.

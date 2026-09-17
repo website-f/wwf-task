@@ -49,12 +49,19 @@ Coordinates are % of the map image. `box` = highlight rectangle (x,y = top-left,
 |---|-------|-------------|------------------------------|
 | 1 | center | Intro (no heading): "We talk a lot about *tiger prey*, but what animals do tigers eat?" / "The most important tiger prey are often ungulates, which are mammals with hooves, such as large deer, wild cattle, and wild pigs. Let's take a look at some of the places where tiger prey are found." | none — map fully bright |
 | 2 | right | **SAMBAR DEER** + photo `original_ww185785` (3928×2497). Caption: "Sambar foal and its mother in Ranthambore Tiger Reserve, India © Martin Harvey / WWF" | 48.5, 43.0, 17.1, 39.3 (India/Nepal region) |
-| 3 | left | **WILD PIG** + photo `original_ww258518` (4096×2731). Caption: "Wild boar have brown fur that provides excellent camouflage in the forest. © Ola Jennersten / WWF-Sweden" | 66.5, 79.4, 20.0, 22.6 (Sumatra/Indonesia) |
+| 3 | left | **WILD PIG** + photo `original_ww258518` (4096×2731). Caption: "Wild boar have brown fur that provides excellent camouflage in the forest. © Ola Jennersten / WWF-Sweden" | 66.5, 79.4, 20.0, **22.6** (Sumatra/Indonesia) — see note below |
 | 4 | right | **BANTENG** + photo `medium_ww194699` (1200×803). Caption: "A male banteng photographed in Kuiburi National Park, Thailand. © Wayuphong Jitvijak / WWF-Greater Mekong". Second paragraph contains external link (sciencedirect) styled `#1155cc` underlined. | 66.2, 55.5, 14.0, 18.3 (Thailand) |
 | 5 | right | **BUKHARA DEER** + photo `3-1797x1080`. Caption: "Newly released bukhara deer, Kazakhstan. © WWF" | 52.0, 16.0, 15.5, 20.0 (Kazakhstan) |
 | 6 | right | **NILGAI** + photo `original_ww2138425` (4096×2731). Caption: "Nilgai spotted in Ranthambore Tiger Reserve, India. © Ola Jennersten / WWF-Sweden" | 46.2, 42.0, 17.7, 33.9 (India) |
 | 7 | left | **CHITAL** + photo `_ww1118135` (2288×1762). Caption: "Chital recorded on camera traps set up to monitor wildlife in the Khata Corridor, Nepal. © DoFSC / WWF Nepal" | 56.4, 40.7, 11.4, 14.8 (India/Nepal/Bangladesh) |
 | 8 | center | Outro: "These are just a few examples of the many tiger prey species, other important ungulates for tigers in parts of their range include gaur, roe deer, sika deer, hog deer, muntjac, barasingha, and eld's deer." | none |
+
+> **Note on wild pig's height.** The original stores `h: 22.6` at `y: 79.4`, i.e. the box
+> runs 2% past the bottom edge of the image. Our rebuild (and the CMS block) clamp to
+> `h: 20.6` so `y + h = 100`. The clamp rule (`x+w ≤ 100`, `y+h ≤ 100`) is applied on every
+> write path in the editor and re-applied server-side in `render.php` — a deliberate
+> "editors can't draw outside the artwork" decision. The visible difference is nil: that
+> 2% band is below the bottom of the viewport at every desktop aspect ratio.
 
 Grid mapping of `align` (12-col grid):
 - center → `col-6 offset-3` (lg & md)
@@ -66,12 +73,23 @@ Grid mapping of `align` (12-col grid):
 
 | Role | Spec |
 |---|---|
-| Headings (h2 in cards, titles) | `font-family:"WWF",sans-serif` (local `wwf.woff`, weight 400 & 700 both map to same file); `text-transform:uppercase`; `font-size:220%` base, `250%` ≥ larger breakpoint; `line-height:1.1`; `margin:1.5rem 0`; color inherits (#000 here) |
+| Headings (h2 in cards) | `font-family:"WWF",sans-serif` (local `wwf.woff`); `text-transform:uppercase`; colour `#000`. **Size — read the override chain:** the h2 carries `Theme-Layer-BodyText-Heading-Large` (220% → 250%) *and* `Theme-TextSize-xxsmall`, and the latter wins: **`font-size:160%`, stepping to `180%`; `line-height:1.2`**. The faithful build matched 160%/180% + lh 1.2 exactly. The current redesign uses a fluid `clamp()` display size instead — a deliberate change, but the override chain is still the answer if anyone asks why the original's headings aren't 220%. |
 | Body | `font-family:"Open Sans",sans-serif`; color `#000`; antialiased |
 | Base font-size (on `.Theme-Story`) | 17px default → 18px / 20px / 22px stepping up at wider breakpoints (Shorthand steps at ~620/1100/1600) |
 | Card paragraphs | margin `.5em 0` |
 | Captions | `.Theme-Caption` — smaller size (~65–75%), muted; verify in DevTools during build |
 | em in intro ("tiger prey") | italic |
+
+### Map framing (measured, not guessed)
+
+`.Scrollpoints__media { width:100%; min-height:100vh }` with a cover-scaled image. Critically,
+the original **anchors the crop to the LEFT edge**, not the centre. Proof: at 1600×900 the map
+(2561×1224, 2.09:1) cover-scales to 1883×900, overflowing by 283px. A centred crop puts the
+left edge at −141px and eats the "TIGER RANGE COUNTRIES" title; the captured original
+(`research/shots/desktop-intro.png`) shows the title fully intact with the tiger logo at
+x≈155px — i.e. left edge at 0. Our build exposes this as `data-focal="0 50"` →
+`object-position: 0% 50%` and the same numbers in the JS cover math, so the CMS can set a
+focal point per image.
 
 ## 4. Colors & effects
 

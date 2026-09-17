@@ -10,20 +10,24 @@ Recreation of the 2nd webpart from
 - [x] Original assets captured (map, WWF font, 6 prey photos, mobile crops)
 - [x] Planning pack complete (`docs/`)
 - [x] Task 1 build — standalone [src/standalone/index.html](src/standalone/index.html)
-      (verified with headless-browser screenshots at 5 scroll states, desktop + mobile — see `research/shots/`)
+      (verified by capturing the original and the rebuild in headless Chromium at the same
+      viewports and scroll states — `research/shots/desktop-*` are the original,
+      `research/shots/verify-*` are the rebuild)
 - [x] Task 2 demo — WordPress Gutenberg block [src/wp-plugin/](src/wp-plugin/)
       (`docker compose up -d` → localhost:8280)
 - [ ] Rehearsal
 
 ## Quick start
 
-- **Task 1**: open `src/standalone/index.html` in a browser. One file, zero dependencies.
-  Default is **cinematic mode** (spring camera + push-in zoom + glow pulse + progress
-  rail); append `?mode=faithful` for the original's exact CSS behaviour.
-- **Task 2**: `cd src/wp-plugin && docker compose up -d` → **http://localhost:8280 is the
-  live webpart** (fully seeded: images in media library, page published as front page).
-  Edit live: http://localhost:8280/wp-admin (admin / admin) → Pages → "Tiger Range
-  Countries" ([full steps](src/wp-plugin/README.md)).
+- **Task 1**: open `src/standalone/index.html` in a browser. Three files, one vendored
+  dependency (GSAP + ScrollTrigger), no build step. Scroll: the map pins, the camera flies
+  and **zooms into each highlighted region**, a paw-print trail walks between them, and the
+  card always lands in the *opposite* half of the screen so it never covers the region.
+- **Task 2**: `cd src/wp-plugin && docker compose up -d`, then the three WP-CLI commands in
+  [src/wp-plugin/README.md](src/wp-plugin/README.md#12-install--seed-one-block-run-once) →
+  **http://localhost:8280 is the live webpart**. Edit it at
+  http://localhost:8280/wp-admin (**admin / admin**) → Pages → "Tiger Range Countries".
+  Editors draw the regions on the map, drag them to move, drag corners to resize.
 
 ## Read in this order
 
@@ -32,15 +36,22 @@ Recreation of the 2nd webpart from
 3. [docs/02-CMS-INTEGRATION-PLAN.md](docs/02-CMS-INTEGRATION-PLAN.md) — Task 2: data model, editor UX, rendering, validation
 4. [docs/03-CODE-WALKTHROUGH-SCRIPT.md](docs/03-CODE-WALKTHROUGH-SCRIPT.md) — interview-day script + Q&A prep
 5. **[docs/05-CODE-EXPLANATION.md](docs/05-CODE-EXPLANATION.md) — ⭐ the presentation master doc: every method explained, self code-review, demo runbook**
-6. [docs/04-ASSETS-CHECKLIST.md](docs/04-ASSETS-CHECKLIST.md) — asset inventory + licensing note
+6. **[docs/06-FILE-BY-FILE-REFERENCE.md](docs/06-FILE-BY-FILE-REFERENCE.md) — every file and every function in one table, plus the known-deviations list**
+7. **[docs/07-EDITOR-GUIDE.md](docs/07-EDITOR-GUIDE.md) — the non-technical editor's manual: add the block, draw regions, edit everything, publish**
+8. [docs/04-ASSETS-CHECKLIST.md](docs/04-ASSETS-CHECKLIST.md) — asset inventory + licensing note
 
 ## One-paragraph summary of the approach
 
-The webpart is a scroll-driven spotlight map: a full-viewport map image (labels baked into
-the artwork) pins while intro/species/outro cards scroll over it; active cards with a
-hotspot dim the map and frame their region with a traveling 0.8s-eased highlight window.
-Task 1 rebuilds this in a single dependency-free HTML file (sticky positioning +
-IntersectionObserver + CSS transitions), reusing the original assets for pixel fidelity.
+The webpart is a scroll-driven map: a full-viewport map pins while story cards scroll over
+it, and each card's region is highlighted on the map. Task 1 rebuilds it and takes it
+further — the camera **flies and zooms** into each region as you scroll, a paw-print trail
+walks between regions, pins drop, headings reveal line by line, and the card is always laid
+out in the half of the screen the region is *not* in, so it can never cover what you're
+reading about. GSAP ScrollTrigger owns the motion; the original's own hotspot coordinates
+and left-anchored map framing are kept. Task 2 turns every one of those values into block
+attributes behind a WordPress block whose editor lets a non-technical person draw the
+regions directly on the map — with the front end rendered server-side from the same markup,
+sharing the stylesheet and engine byte-for-byte with Task 1.
 Task 2 turns the hard-coded points/hotspots into a JSON data model behind a custom
 WordPress Gutenberg block — editors add the block, draw hotspot rectangles directly on the
 image, reorder points by drag, and use WP's native draft preview — with the same

@@ -2,29 +2,39 @@
   "$schema": "https://schemas.wp.org/trunk/block.json",
   "apiVersion": 3,
   "name": "wwf/scrollmap",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "title": "Scroll Map",
   "category": "media",
   "icon": "location-alt",
-  "description": "Scroll-driven map with a traveling spotlight: a pinned background image, hotspot regions and story cards. Rebuild of the Shorthand 'Scrollpoints' pattern.",
-  "keywords": ["map", "scrollytelling", "hotspot", "spotlight", "wwf"],
+  "description": "A scroll-driven map: the camera flies and zooms to each highlighted region while story cards scroll past. Editors set the map, draw the regions, and write the cards.",
+  "keywords": ["map", "scrollytelling", "hotspot", "story", "zoom", "wwf"],
   "textdomain": "wwf-scrollmap",
   "supports": {
     "html": false,
     "multiple": true,
-    "align": ["full"]
+    "align": ["full"],
+    "spacing": { "margin": true }
   },
   "attributes": {
-    "align":        { "type": "string",  "default": "full" },
-    "sectionTitle": { "type": "string",  "default": "Scroll map" },
-    "mode":         { "type": "string",  "default": "cinematic", "enum": ["cinematic", "faithful"] },
-    "backgroundImage": { "type": "object", "default": null },
-    "dimOpacity":     { "type": "number", "default": 0.5 },
-    "highlightColor": { "type": "string", "default": "#2a6788" },
-    "highlightWidth": { "type": "number", "default": 4 },
-    "travelMs":       { "type": "number", "default": 800 },
-    "cardOpacity":    { "type": "number", "default": 0.85 },
-    "points":         { "type": "array",  "default": [] }
+    "align":           { "type": "string",  "default": "full" },
+
+    "sectionTitle":    { "type": "string",  "default": "" },
+    "backgroundImage": { "type": "object",  "default": null },
+    "focalX":          { "type": "number",  "default": 0 },
+    "focalY":          { "type": "number",  "default": 50 },
+
+    "showPaws":        { "type": "boolean", "default": true },
+    "showMarkers":     { "type": "boolean", "default": true },
+    "showRail":        { "type": "boolean", "default": true },
+
+    "accentColor":     { "type": "string",  "default": "#8fd14f" },
+    "inkColor":        { "type": "string",  "default": "#f2efe6" },
+    "backdropColor":   { "type": "string",  "default": "#04140d" },
+    "cardColor":       { "type": "string",  "default": "#071a11" },
+    "dimOpacity":      { "type": "number",  "default": 0.62 },
+    "cardOpacity":     { "type": "number",  "default": 0.84 },
+
+    "points":          { "type": "array",   "default": [] }
   },
   "editorScript": "file:./editor.js",
   "editorStyle":  "file:./editor.css",

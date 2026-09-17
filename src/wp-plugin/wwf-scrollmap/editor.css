@@ -1,128 +1,253 @@
-/**
- * wwf/scrollmap — editor-only styles: the canvas, hotspot boxes, draw layer
- * and the inline card preview.
- */
+/* ===========================================================================
+   wwf/scrollmap — editor chrome only.
+   The front-end stylesheet (style.css) is also loaded in the editor via
+   block.json's `style`, so anything that looks like the published page is
+   inherited rather than duplicated here.
+   ======================================================================== */
 
-.wwfsm-editor { max-width: 100%; }
+.wwfsm-editor {
+	background: #0b1a13;
+	color: #f2efe6;
+	border-radius: 8px;
+	padding: 14px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
 
-/* --- canvas: the map with hotspot boxes ---------------------------------- */
+/* ---------------------------------------------------------------- header */
+.wwfsm-head {
+	display: flex; align-items: center; gap: 12px;
+	margin-bottom: 12px; flex-wrap: wrap;
+}
+.wwfsm-badge {
+	padding: 4px 10px; border-radius: 999px;
+	background: #8fd14f; color: #06200f;
+	font-size: 11px; font-weight: 700;
+	letter-spacing: .12em; text-transform: uppercase;
+}
+.wwfsm-headnote { font-size: 12px; opacity: .6; }
+
+/* ---------------------------------------------------------------- canvas */
+.wwfsm-canvaswrap { position: relative; }
+
 .wwfsm-canvas {
 	position: relative;
-	line-height: 0;
-	border-radius: 4px;
 	overflow: hidden;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+	border-radius: 6px;
 	user-select: none;
+	touch-action: none;                 /* pointer drags must not scroll the page */
+	background: #04140d;
 }
-.wwfsm-canvas img { width: 100%; height: auto; display: block; }
+.wwfsm-canvas img { display: block; width: 100%; height: auto; }
 .wwfsm-canvas.is-drawing { cursor: crosshair; }
-.wwfsm-canvas.is-drawing img { pointer-events: none; }
-
-.wwfsm-box {
-	position: absolute;
-	background: transparent;
-	border: 3px dashed currentColor;
-	border-color: #2a6788;
-	border-radius: 2px;
-	cursor: pointer;
-	padding: 0;
-	opacity: 0.55;
-	transition: opacity 0.15s ease;
-}
-.wwfsm-box:hover { opacity: 0.9; }
-.wwfsm-box.is-selected {
-	border-style: solid;
-	opacity: 1;
-	box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.25);
-}
-.wwfsm-box.is-drafting { pointer-events: none; }
-
-.wwfsm-box__n {
-	position: absolute;
-	top: -12px;
-	left: -12px;
-	min-width: 24px;
-	height: 24px;
-	border-radius: 50%;
-	background: #1e1e1e;
-	color: #fff;
-	font-size: 12px;
-	font-weight: 600;
-	line-height: 24px;
-	text-align: center;
-}
+.wwfsm-canvas.is-drawing img { opacity: .82; }
 
 .wwfsm-canvas__hint {
-	position: absolute;
-	top: 12px;
-	left: 50%;
+	position: absolute; left: 50%; top: 14px;
 	transform: translateX(-50%);
-	background: rgba(30, 30, 30, 0.9);
-	color: #fff;
-	font-size: 12px;
-	line-height: 1;
-	padding: 8px 14px;
-	border-radius: 999px;
+	padding: 6px 12px; border-radius: 999px;
+	background: rgba(0, 0, 0, .78);
+	font-size: 12px; white-space: nowrap;
 	pointer-events: none;
 }
 
-/* --- inline card preview -------------------------------------------------- */
-.wwfsm-cardwrap { display: flex; margin-top: 16px; }
-.wwfsm-cardwrap[data-align="left"]   { justify-content: flex-start; }
-.wwfsm-cardwrap[data-align="center"] { justify-content: center; }
-.wwfsm-cardwrap[data-align="right"]  { justify-content: flex-end; }
-
-.wwfsm-card {
-	width: min(560px, 100%);
-	border-radius: 0.5em;
-	padding: 18px 24px;
-	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+/* region boxes ------------------------------------------------------------ */
+.wwfsm-box {
+	position: absolute;
+	border: 2px solid #8fd14f;
+	border-radius: 4px;
+	background: rgba(143, 209, 79, .12);
+	cursor: move;
 }
-
-.wwfsm-card__heading {
-	width: 100%;
-	border: none;
-	background: transparent;
-	font-weight: 700;
-	text-transform: uppercase;
-	font-size: 1.4em;
-	line-height: 1.2;
-	padding: 0 0 4px;
-	box-shadow: none;
+/* Regions overlap (India carries three of them), so the selected one is
+   lifted above the rest and its numbered badge is always clickable — that
+   badge is the reliable way to pick a region that sits under another. */
+.wwfsm-box.is-selected {
+	background: rgba(143, 209, 79, .2);
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, .5), 0 0 22px rgba(143, 209, 79, .45);
+	z-index: 3;
 }
-.wwfsm-card__heading:focus { outline: 1px dashed #949494; }
-
-.wwfsm-card__body { min-height: 40px; }
-.wwfsm-card__body p { margin: 0.4em 0; }
-
-.wwfsm-card__figure { margin: 12px 0 0; }
-.wwfsm-card__figure img { width: 100%; height: auto; border-radius: 2px; }
-.wwfsm-card__figure figcaption {
-	text-align: center;
-	opacity: 0.6;
-	font-size: 12px;
-	margin-top: 4px;
+.wwfsm-box__n {
+	position: absolute; left: -10px; top: -10px;
+	z-index: 4;
+	width: 22px; height: 22px; border-radius: 50%;
+	display: grid; place-items: center;
+	color: #06200f; font-size: 11px; font-weight: 800;
+	cursor: pointer;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
 }
+.wwfsm-box__n:hover { transform: scale(1.18); }
 
-/* --- sidebar points list --------------------------------------------------- */
-.wwfsm-list { margin: 0 0 12px; padding: 0; list-style: none; }
-.wwfsm-list__row {
-	display: flex;
-	align-items: center;
-	gap: 2px;
-	padding: 2px 4px;
+.wwfsm-handle {
+	position: absolute;
+	width: 12px; height: 12px;
+	background: #fff;
+	border: 2px solid #8fd14f;
 	border-radius: 3px;
 }
-.wwfsm-list__row.is-selected { background: #f0f6fc; box-shadow: inset 0 0 0 1px #3582c4; }
-.wwfsm-list__label {
-	flex: 1;
-	text-align: left;
-	background: none;
-	border: none;
-	padding: 6px 4px;
-	cursor: pointer;
-	font-size: 13px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.wwfsm-handle--tl { left: -7px;  top: -7px;    cursor: nwse-resize; }
+.wwfsm-handle--tr { right: -7px; top: -7px;    cursor: nesw-resize; }
+.wwfsm-handle--bl { left: -7px;  bottom: -7px; cursor: nesw-resize; }
+.wwfsm-handle--br { right: -7px; bottom: -7px; cursor: nwse-resize; }
+
+/* layout guide ------------------------------------------------------------
+   Shows the editor where the camera will place the region and where the card
+   will sit, so the "card never covers the region" rule is visible at edit
+   time rather than a surprise at preview time. */
+.wwfsm-ghost,
+.wwfsm-ghostcard {
+	position: absolute; top: 14%; height: 72%;
+	border-radius: 10px;
+	display: grid; place-items: center;
+	padding: 6px;
+	text-align: center;
+	font-size: 10px; font-weight: 700;
+	letter-spacing: .12em; text-transform: uppercase;
+	pointer-events: none;
 }
+.wwfsm-ghost > span,
+.wwfsm-ghostcard > span {
+	padding: 4px 9px; border-radius: 999px;
+	background: rgba(0, 0, 0, .55);
+	backdrop-filter: blur(4px);
+}
+.wwfsm-ghost {
+	width: 40%;
+	border: 1.5px dashed rgba(255, 255, 255, .7);
+	color: #fff;
+}
+.wwfsm-ghostcard {
+	width: 32%;
+	border: 1.5px solid rgba(143, 209, 79, .75);
+	background: rgba(7, 26, 17, .3);
+	color: #8fd14f;
+}
+.wwfsm-ghost[data-side="right"]     { left: 6%; }
+.wwfsm-ghostcard[data-side="right"] { right: 5%; }
+.wwfsm-ghost[data-side="left"]      { right: 6%; }
+.wwfsm-ghostcard[data-side="left"]  { left: 5%; }
+
+/* toolbar under the canvas ------------------------------------------------ */
+.wwfsm-canvasbar {
+	display: flex; align-items: center; gap: 10px;
+	margin-top: 10px; flex-wrap: wrap;
+}
+.wwfsm-canvasbar__t {
+	font-size: 12px; font-weight: 600; opacity: .7;
+	margin-right: auto;
+}
+.wwfsm-canvasbar .components-button.is-tertiary { color: #8fd14f; }
+
+/* ---------------------------------------------------------------- preview */
+.wwfsm-previewwrap { margin-top: 16px; }
+.wwfsm-previewlabel {
+	margin: 0 0 6px; font-size: 11px;
+	letter-spacing: .12em; text-transform: uppercase; opacity: .5;
+}
+.wwfsm-preview {
+	border-radius: 8px;
+	padding: 18px;
+	display: flex;
+}
+.wwfsm-card {
+	width: 100%; max-width: 480px;
+	padding: 18px 20px;
+	border-radius: 16px;
+	border: 1px solid rgba(242, 239, 230, .16);
+}
+.wwfsm-card.is-wide { max-width: 620px; }
+
+.wwfsm-card__meta,
+.wwfsm-card__eyebrow {
+	display: flex; align-items: center; gap: 9px;
+	margin-bottom: 10px;
+	font-size: 11px; font-weight: 700;
+	letter-spacing: .14em; text-transform: uppercase;
+}
+.wwfsm-card__num {
+	display: grid; place-items: center;
+	width: 24px; height: 24px; border-radius: 50%;
+	border: 1px solid currentColor; font-size: 10px;
+}
+
+/* the inline fields, dressed down so the card still reads as a card */
+.wwfsm-card .components-base-control { margin-bottom: 10px; }
+.wwfsm-card .components-base-control__label {
+	color: rgba(242, 239, 230, .45) !important;
+	font-size: 10px !important; letter-spacing: .1em; text-transform: uppercase;
+}
+.wwfsm-card .components-base-control__help {
+	color: rgba(242, 239, 230, .4) !important; font-size: 11px; font-style: italic;
+}
+.wwfsm-card textarea.components-textarea-control__input,
+.wwfsm-card input.components-text-control__input {
+	background: rgba(0, 0, 0, .28) !important;
+	border-color: rgba(242, 239, 230, .18) !important;
+	color: inherit !important;
+}
+.wwfsm-f--heading textarea.components-textarea-control__input {
+	font-family: "WWF", "Arial Narrow", sans-serif;
+	font-size: 26px !important; line-height: 1.05 !important;
+	text-transform: uppercase;
+}
+.wwfsm-card__body {
+	min-height: 60px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: rgba(0, 0, 0, .2);
+	font-size: 14px; line-height: 1.6;
+}
+.wwfsm-card__body:focus { outline: 2px solid #8fd14f; }
+.wwfsm-card__figure { margin: 12px 0 0; }
+.wwfsm-card__figure img { width: 100%; border-radius: 8px; display: block; }
+.wwfsm-card__figure figcaption {
+	margin-top: 6px; font-size: 11px; opacity: .6;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+.wwfsm-list { margin: 0 0 10px; padding: 0; list-style: none; }
+.wwfsm-list__row {
+	display: flex; align-items: center; gap: 1px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	margin-bottom: 5px;
+	background: #fff;
+}
+.wwfsm-list__row.is-selected { border-color: #8fd14f; box-shadow: 0 0 0 1px #8fd14f; }
+.wwfsm-list__row.is-invalid { border-left: 3px solid #d63638; background: #fcf0f1; }
+
+.wwfsm-list__label {
+	flex: 1 1 auto; min-width: 0;
+	display: flex; align-items: center; gap: 8px;
+	padding: 7px 8px;
+	background: none; border: 0; cursor: pointer;
+	text-align: left; font-size: 12px;
+}
+.wwfsm-list__n {
+	flex: none;
+	width: 19px; height: 19px; border-radius: 50%;
+	display: grid; place-items: center;
+	background: #1e1e1e; color: #fff; font-size: 10px; font-weight: 700;
+}
+.wwfsm-list__row.is-selected .wwfsm-list__n { background: #8fd14f; color: #06200f; }
+.wwfsm-list__t {
+	flex: 1 1 auto; min-width: 0;
+	overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wwfsm-list__k {
+	flex: none; font-size: 9px; font-weight: 700; letter-spacing: .08em;
+	color: #757575; border: 1px solid #ddd; border-radius: 3px; padding: 1px 4px;
+}
+.wwfsm-list__row.is-invalid .wwfsm-list__t::after {
+	content: " — needs text"; color: #d63638; font-size: 11px;
+}
+
+.wwfsm-addrow { display: flex; gap: 6px; margin-top: 4px; }
+.wwfsm-demo { margin-top: 10px !important; display: block; }
+
+.wwfsm-hint {
+	margin: -2px 0 12px;
+	font-size: 11.5px; line-height: 1.5; color: #757575; font-style: italic;
+}
+
+.wwfsm-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.wwfsm-nums .components-base-control { margin-bottom: 8px; }

@@ -1,460 +1,434 @@
-# Code Explanation & Review — Interview Presentation Master Doc
+# Code Explanation — the deep technical doc
 
-This is the single document to present from. It explains **every method in the
-final code**, why it was chosen over the alternatives, and the code-review
-critique you should be ready to give and receive. File references:
+Everything that is interesting about this build, and why it was done that way. Present from
+[`03-CODE-WALKTHROUGH-SCRIPT.md`](03-CODE-WALKTHROUGH-SCRIPT.md); use this when someone digs.
 
-- Task 1: [`src/standalone/index.html`](../src/standalone/index.html) (one file: markup + CSS + JS)
-- Task 2: [`src/wp-plugin/wwf-scrollmap/`](../src/wp-plugin/wwf-scrollmap/) (WordPress block plugin)
+- Task 1: `src/standalone/` — `index.html`, `scrollmap.css`, `scrollmap.js`
+- Task 2: `src/wp-plugin/wwf-scrollmap/` — the same CSS and engine, plus a block
+- File-by-file index: [`06-FILE-BY-FILE-REFERENCE.md`](06-FILE-BY-FILE-REFERENCE.md)
 
 ---
 
-# PART A — How the original works (30-second framing)
+# PART A — the original, in 30 seconds
 
-The reference page is built with **Shorthand**. The second webpart is their
-"Scrollpoints" section:
+The reference page is built with **Shorthand**. The second webpart is their "Scrollpoints"
+section:
 
-1. A full-screen **map image is pinned** to the viewport while the section scrolls.
-   Every label (countries, tiger counts, legend, the big title) is **baked into
-   the image** — none of it is HTML.
-2. **Story cards** scroll over the pinned map (intro → 6 prey species → outro),
-   alternating left/right/center on a 12-column grid.
-3. Cards with a **highlight box** (x/y/w/h as % of the image) dim the map to
-   50% black and cut a bright, blue-bordered **spotlight window** that
-   **travels with a 0.8s transition** between regions.
+1. A full-screen map image **pinned** to the viewport. Every label, tiger count, the legend
+   and the big title are **baked into the artwork** — none of it is HTML.
+2. **Story cards** scroll over it (intro → 6 prey species → outro), on a 12-column grid.
+3. Cards with a **highlight box** (x/y/w/h as % of the image) dim the map to 50% black and cut
+   a bright, blue-bordered window that **travels with a 0.8s CSS transition**.
 
-Everything below reproduces that — then improves specific weaknesses
-(accessibility, the mobile fork, the double-image spotlight).
+All measured, not guessed — see [`01-WEBPART-ANALYSIS.md`](01-WEBPART-ANALYSIS.md). The six
+hotspot rectangles used in this build are the original's own `data-box` JSON.
 
-# PART B — Task 1 standalone: every technique explained
+## A1. The decision to redesign
 
-## B1. Layer architecture
+The faithful rebuild was built first and is in the git history. This build keeps the
+original's **structure** (pinned map, scrolling chapters, per-chapter regions), its
+**content**, its **hotspot coordinates** and its **map framing**, and replaces the treatment:
+the camera now flies and zooms into each region instead of a static dim, in a dark cinematic
+palette, with a layout rule that guarantees the card never covers the region.
+
+🗣 *"Fidelity was the baseline, not the ceiling. If WWF wants the original look back it's a
+stylesheet and two config values — the engine doesn't change."*
+
+---
+
+# PART B — Task 1
+
+## B1. Layer model
 
 ```
-<section class="scrollmap">                     ← tall scroll container
- ├─ .scrollmap__viewport   position:sticky, 100dvh, overflow:hidden
- │   └─ .scrollmap__stage  JS-sized to the map's cover geometry; camera transform
- │       ├─ img.scrollmap__map
- │       ├─ button.scrollmap__pin ×14           ← bonus hover hotspots
- │       └─ .scrollmap__frame                   ← spotlight (dim + window + border)
- └─ .scrollmap__points     margin-top:-100dvh   ← cards pulled up over the stage
-     └─ article.scrollmap__point ×8 (data-align, data-hotspot)
+section.tgr                            tall scroll container
+├─ div.tgr__stage        position:sticky; height:100dvh; overflow:hidden
+│   ├─ div.tgr__camera   transform: translate(x,y) scale(k)   ← "the camera"
+│   │   ├─ img.tgr__map
+│   │   └─ div.tgr__marker × 6         pins, counter-scaled by --inv
+│   ├─ div.tgr__grade    vignette / colour grade
+│   ├─ div.tgr__frame    the spotlight — SCREEN space, not camera space
+│   ├─ div.tgr__chip     region badge, pinned to the spotlight
+│   ├─ svg.tgr__paws     paw trail — screen space
+│   └─ nav.tgr__rail     chapter rail (built by JS)
+└─ div.tgr__steps        margin-top:-100dvh  ← cards pulled over the stage
+    └─ article.step × 8      140vh tall (135vh on phones)
+        └─ div.step__pin     position:sticky — THE CARD IS PINNED, NOT SCROLLED
+            └─ div.card      data-side, data-zoom, data-label, data-hotspot on .step
 ```
 
-### Why `position: sticky` and not `position: fixed`?
+**The card is pinned.** `.step__pin` is sticky inside a step that is taller than
+the screen, so a card holds still at a fixed spot while its region is on the
+map, and cards **cross-fade in place** rather than sliding past each other. That
+is the structural half of the fix described in B6a; without it, two cards are on
+screen during every hand-over and it is ambiguous which one goes with the
+highlight.
 
-Shorthand toggles `absolute/fixed/absolute` (`data-attach=before|during|after`)
-with scroll listeners — the pre-sticky-era technique. `position: sticky` gives
-the identical pin/unpin on the compositor thread with **zero JS**: the viewport
-sticks at `top: 0` while the section has room, then naturally "parks" and
-scrolls away at the section's end — exactly their `attach=after` state.
-*Talking point: I know both patterns; I chose the platform one and can name
-what it replaced.*
+`position: sticky` rather than the original's scroll-driven `absolute/fixed/absolute` switch:
+same pin and park, on the compositor, with zero JS. 🗣 *"I know the pre-sticky pattern they
+used; I chose the platform one."*
 
-### The `-100dvh` trick
+## B2. Why GSAP — the honest version
 
-The sticky viewport occupies the first 100vh of the section. The cards
-container pulls itself up by `margin-top: -100dvh` so cards start **over** the
-map rather than after it. Scroll length = height of the cards. This is the
-standard scrollytelling skeleton (same one scrollama.js documents).
+The first build was zero-dependency: a hand-written exponential-smoothing spring in a rAF
+loop, plus IntersectionObserver. ~250 lines. It worked.
 
-### Why the stage is JS-sized instead of plain `object-fit: cover`
+But the genuinely hard part of this webpart is **scrubbed, interruptible, resize-correct**
+scroll animation, and that is exactly ScrollTrigger's job:
 
-Hotspots are stored as **percentages of the image**. If the image is cropped
-by `object-fit`, element percentages no longer match image percentages. So JS
-recomputes the cover geometry once per resize:
+| What's hard | What GSAP gives |
+|---|---|
+| Animation tied to scroll *position*, not fired once | `scrub: 0.7` |
+| Reversing mid-flight without a restart | inherent to a scrubbed tween |
+| Geometry recomputed and animations **re-aimed** after a resize | functional values + `invalidateOnRefresh` |
+| Desktop / mobile / reduced-motion as separate behaviours, cleanly torn down | `gsap.matchMedia()` |
+| Sequencing a reveal that also plays backwards | `timeline` + `toggleActions: 'play reverse play reverse'` |
+
+That is ~40 lines of declaration here instead of ~250 lines of machinery I own and have to
+defend. It is vendored (`vendor/gsap.min.js`, `vendor/ScrollTrigger.min.js`, ~115KB, deferred)
+rather than pulled from a CDN, so there is no third-party runtime dependency and the version is
+pinned by the deploy.
+
+What I deliberately did **not** delegate: layout. The grid, the responsive split and the card
+are hand-written CSS, because that is where the fidelity lives and I want it readable.
+
+## B3. `freeArea()` — the rule that answers the brief
 
 ```js
-var s = Math.max(vw / iw, vh / ih);      // cover scale
-var w = iw * s, h = ih * s;              // rendered image size
-var x = (vw - w) / 2, y = (vh - h) / 2;  // centred overflow (negative)
-```
-
-…and sizes the **stage** to exactly that box. Now the frame and the pins
-position themselves with plain CSS percentages — **no per-element math, no
-drift**. CSS still declares `inset: 0` + `object-fit: cover` as the no-JS
-fallback.
-
-> Bug I hit and fixed (honest war story for the interview): I originally reset
-> the fallback with `stage.style.inset = 'auto'` *after* setting `left/top` —
-> but `inset` is the shorthand for those same properties, so it wiped them.
-> The fix: don't touch `inset` at all; explicit `left/top/width/height` win
-> anyway because an over-constrained absolute box ignores `right/bottom`.
-> Found it by screenshot-diffing states in headless Chromium.
-
-## B2. The spotlight — one element instead of two images
-
-The original implements the spotlight as: a black overlay div (opacity .5)
-covering the map **plus** a window div whose `background-image` is a second
-copy of the map, background-positioned so its pixels line up with the map
-underneath.
-
-My version is one element:
-
-```css
-.scrollmap__frame {
-  outline: var(--hl-border) solid var(--hl-color);  /* the blue border   */
-  box-shadow: 0 0 0 200vmax var(--dim);             /* the dim, with a   */
-                                                    /* hole = the element */
-  transition: left .8s ease, top .8s ease, width .8s ease, height .8s ease,
-              opacity .5s ease;
+function freeArea(side) {
+  if (isMobile()) return { cx: vw*0.5, cy: vh*0.5, w: vw*0.82, h: vh*0.7 };
+  return { cx: side === 'left' ? vw*0.72 : vw*0.30, cy: vh*0.52, w: vw*0.40, h: vh*0.60 };
 }
 ```
 
-- A **200vmax hard box-shadow** dims everything around the box; the box itself
-  is the untouched, fully-bright map — a real hole, so alignment is pixel-perfect
-  *by construction* (nothing to keep in sync on resize).
-- `outline` instead of `border` because outline draws **outside** the box and
-  never shifts the geometry (no border-box math).
-- Moving `left/top/width/height` moves the hole → the traveling dim cutout
-  and the border animate together with the original's exact `0.8s ease`.
+The card is laid out in one half of the screen by CSS (`grid-column: 8/span 5` or
+`1/span 5`), and every camera shot is solved to land the region in the middle of the **other**
+half. On a phone `geo.vh` *is* the 45vh map window, so aiming at its centre is enough.
 
-**Visibility state machine** (in `moveFrame()`):
+🗣 *"'The card must not cover the highlighted region' is a structural guarantee here, not
+per-chapter tuning. One function decides it — and the editor can see it, because there's a
+layout guide in the block editor that draws both boxes."*
 
-- point has hotspot → set box, add `.is-active` (opacity 1)
-- point has none  → remove `.is-active` (dim fades out; intro/outro = bright map)
-- hidden → visible: **jump silently first** (`transition: none`, set box, force
-  a reflow with `void frame.offsetWidth`, restore transition) so the frame
-  fades in *in place* instead of visibly traveling from a stale position.
-  That forced-reflow line is a classic — be ready to explain that style writes
-  are batched, and reading `offsetWidth` forces the browser to apply the
-  pending `transition:none` before the next write.
+## B4. `shotFor()` — the camera maths
 
-## B3. Scroll activation — IntersectionObserver band
+`transform-origin: 0 0`, so a point *p* in the camera layer renders at `pos + t + k·p`. One
+linear equation per axis:
 
 ```js
-new IntersectionObserver(cb, { rootMargin: '-42% 0px -42% 0px', threshold: 0 });
+const k = clamp(min(area.w/boxW, area.h/boxH) * step.zoom, 1.05, isMobile() ? 5 : 3.4);
+let tx = area.cx - k*cx - L.x;          // solve so the region centre hits the target
+let ty = area.cy - k*cy - L.y;
+const padX = L.vw*0.08, padY = L.vh*0.09;                  // allowed bleed
+tx = clamp(tx, L.vw - L.x - k*L.w - padX, -L.x + padX);    // never uncover a viewport edge
+ty = clamp(ty, L.vh - L.y - k*L.h - padY, -L.y + padY);
 ```
 
-- Negative top/bottom rootMargins shrink the observed area to a **16%-tall
-  strip across mid-viewport**. A card activates when it enters that strip —
-  i.e. while the reader is actually reading it. This matches the original's
-  activation feel.
-- **Why IO over scroll listeners**: the browser only invokes the callback on
-  band crossings — no work per frame, no `getBoundingClientRect` layout
-  thrash, runs off the main thread until crossing. A naive scroll handler
-  measuring 8 cards per frame is the canonical jank generator.
-- `threshold: 0` = fire as soon as one pixel enters the band (cards are taller
-  than the band, so fractional thresholds would never reach 1 and misfire).
-- Activation is **idempotent** (`if (i === active) return`) and stateless per
-  entry — resistant to fast scrolling and scroll-direction changes.
+The bleed matters: regions at the very edge of the artwork — Indonesia at the bottom,
+Kazakhstan at the top — would otherwise be clamped into a corner far from their target. 8–9%
+of bleed against a stage painted the same forest colour as the vignette is invisible, and buys
+a correct composition.
 
-## B4. The camera — desktop push-in + mobile fly-to
+## B5. `projectFrame()` — why the spotlight can't drift
 
-The original ships **two separate sections** (desktop scrollpoints +
-mobile "background scrollmation" with hand-made portrait crops) and toggles
-them with display classes — content entered twice, images produced twice.
-
-My rebuild keeps **one component**: the stage gets `transform:
-translate(tx,ty) scale(k)` and the **camera moves to the hotspot** — a modest
-cinematic *push-in* on desktop (k 1.06–1.45, focal point biased **away from
-the card column** so the region never hides behind the card), a full *fly-to*
-on mobile (k up to 2.6, focal above centre so the card slides in below).
-
-The math (`cameraFor`), with `transform-origin: 0 0`:
+The spotlight is **never tweened**. Every frame the engine reads the camera's live transform
+and projects the active hotspot into screen space:
 
 ```js
-// zoom: how large the hotspot may appear in the viewport
-desktop: k = clamp(min(0.55*vw/boxW, 0.6*vh/boxH), 1.06, 1.45)
-mobile:  k = clamp(min(0.9 *vw/boxW, 0.55*vh/boxH), 1,    2.6)
-// position: solve  stagePos + t + k·hotspotCentre = focalPoint
-var tx = focalX - k*cx - stageX;
-var ty = focalY - k*cy - stageY;
-// never show gaps: clamp so the scaled stage always covers the viewport
-tx = clamp(tx, vw - stageX - k*stageW, -stageX);
+const k = gsap.getProperty(camera,'scale'), tx = …, ty = …;
+const w = sp.w/100*geo.w*k,  h = sp.h/100*geo.h*k;
+const cx = geo.x + tx + k*((sp.x + sp.w/2)/100*geo.w);
+gsap.set(frame, { width: w, height: h, x: cx - w/2, y: cy - h/2 });
 ```
 
-- With origin `0 0`, a stage-local point `p` renders at `stagePos + t + k·p` —
-  one linear equation per axis, solved for `t`.
-- The clamp keeps map edges glued to viewport edges (no green void).
-- Transform-only animation → compositor-composited, no layout or paint.
+🗣 *"Derived, not animated — so however the scrub behaves, the bright window is wherever the
+map actually is. It cannot get out of register."*
 
-*Talking point: "the original duplicates the section for mobile; I made one
-data model render both behaviours, which is exactly what the CMS needs."*
+And the dim is one element:
 
-## B4b. The spring engine — our own animation system (cinematic mode)
+```css
+.tgr__frame { box-shadow: 0 0 0 200vmax rgba(2,12,7,var(--dim)); }
+```
 
-CSS transitions restart their easing curve every time the value changes —
-scroll quickly through three points and the spotlight visibly "resets".
-Cinematic mode replaces transitions with **one rAF loop running
-exponential-smoothing springs** over every animated value (camera x/y/zoom +
-frame x/y/w/h/opacity):
+The giant hard shadow **is** the dim; the element itself is a real hole, so the bright region
+is pixel-aligned with the map by construction. The original needs two layers — a black overlay
+plus a window carrying a second copy of the map, background-positioned to line up — and has to
+recompute that alignment on every resize.
+
+## B6. The declarations
 
 ```js
-value += (target − value) · (1 − e^(−rate·dt))
+gsap.fromTo(camera,
+  { x: () => shotAt(i-1).x, y: () => shotAt(i-1).y, scale: () => shotAt(i-1).k },
+  { x: () => shotAt(i).x,   y: () => shotAt(i).y,   scale: () => shotAt(i).k,
+    ease: 'power2.inOut', immediateRender: false,
+    onUpdate: () => syncCameraVars(step.spot ? step : steps[i-1]),
+    scrollTrigger: { trigger: step.el, start: 'top 92%', end: 'top 30%',
+                     scrub: 0.7, invalidateOnRefresh: true } });
 ```
 
-Why this is the sophisticated choice (say all four):
+Both endpoints are **functions**. `recompute()` is wired to ScrollTrigger's `refreshInit`, so
+on every refresh — resize, orientation change, mobile URL-bar collapse — the geometry is
+re-measured and `invalidateOnRefresh` re-runs those functions, re-aiming every flight. 🗣
+*"Stale pixel values after a resize is the classic scrollytelling bug. This is the line that
+buys the library its place."*
 
-1. **Interruptible by construction** — a new target just bends the curve
-   mid-flight; velocity is implicit, nothing restarts. Fast scrolling feels
-   fluid instead of jumpy.
-2. **Frame-rate independent** — `dt` is measured per frame, so 60Hz laptops
-   and 144Hz monitors settle in identical wall-clock time. `dt` is clamped
-   `(0, 50ms]` with a nominal fallback, guarding tab-switch jumps and
-   non-monotonic timestamps (a real bug I caught in headless testing —
-   negative `dt` makes the smoothing *diverge*; good war story).
-3. **Self-suspending** — when every value settles within epsilon the loop
-   stops requesting frames: zero idle cost while the visitor reads. A watchdog
-   snaps values to target if rAF is starved (hidden/prerendered pages).
-4. **One clock** — camera and spotlight can never drift out of sync because
-   the same tick writes both.
+On the same scroll range: the spotlight and chip fade, and the vignette (`grade: 0.45` on wide
+shots, `1` on close-ups).
 
-Different rates per channel tune the feel: camera 3.4/s (heavy, cinematic),
-frame 5.2/s (snappier), opacity 6/s. On arrival the frame fires a **glow
-pulse** (CSS keyframe on `::after`, replayed by re-adding a class after a
-forced reflow).
+## B6a. The choreography — why a card can never belong to the wrong highlight
 
-**Mode switch**: `data-mode="cinematic|faithful"` per instance, `?mode=`
-URL override for live comparison. Faithful mode is the original's exact
-CSS-transition behaviour — demo both and say the fidelity target is still
-one attribute away. `prefers-reduced-motion` forces the instant path.
+The first version of this had the camera on a scrubbed tween and the cards on separate
+play/reverse triggers. Their scroll ranges overlapped, so the camera could already be sitting
+on region N+1 while card N was still fully readable. Two cards up at once, and no way to tell
+which card the highlight belonged to. Two rules fixed it.
 
-## B4c. Progress rail
+**Rule 1 — one owner per property.** Each card now has exactly *one* timeline, which fades it
+in, holds it, and fades it out. Previously step N's timeline faded card N *in* and step N+1's
+faded it *out*: two scrubbed timelines owning one property, where whichever rendered last won
+— and a finished tween re-asserts its end value, so card N could snap back to opacity 1 long
+after it should have gone.
 
-Cinematic desktop also gets a dot-rail (right edge, built by JS from the
-points): shows position, hover reveals the point's title, click smooth-scrolls
-to that card (`scrollIntoView block:'center'` lands it exactly in the
-activation band). Real `<button>`s, `aria-current` marks the active dot,
-hidden on mobile and without JS.
+**Rule 2 — three windows, no overlap.** Reading the incoming step's top edge as `T`:
 
-## B5. Bonus hover hotspots (pins)
+```
+   T 134 → 103    the outgoing card slides out and fades      (its own timeline)
+   T  92 →  25    the camera flies and zooms to the new region
+   T  22 →   6    the incoming card slides in and fades up    (its own timeline)
+```
 
-14 invisible `<button>`s positioned over the baked-in country labels
-(percentages of the stage, so they ride the camera transform too), with pure
-CSS tooltips on `:hover`/`:focus-visible`:
+There is a deliberate beat in the middle where **no card is on screen** and you are just
+watching the map travel. That beat is what makes the pairing legible — the card arrives *after*
+the camera lands, so it reads as a caption to what you are looking at.
 
-- Real buttons → keyboard focusable, screen-reader announceable
-  (`.visually-hidden` text inside).
-- Tooltips flip side via `data-tip="left"` for the right-edge countries.
-- These demonstrate the **data-driven hotspot model**: in the CMS, this exact
-  shape (label + text + %-box) is an editable repeater.
+All of it is scrubbed to scroll position, so the order holds at every point and in both
+directions. The windows are derived from one measured constant (`stepVh`), so changing the
+step height in CSS cannot desynchronise them.
 
-## B6. Typography & fidelity numbers (say these confidently)
+**The badge follows the camera, not the scroll trigger.** The region badge used to be set by a
+separate ScrollTrigger, so mid-flight it announced the next region while the frame was still
+drawn around the previous one. Now the camera tween's `onUpdate` decides: before the midpoint
+we are still leaving the old region, after it we are arriving at the new one, and the badge and
+the frame both follow that one decision.
 
-| Token | Value | Source |
+## B6b. Three GSAP bugs worth telling them about
+
+**1. A timeline's duration is the end of its last child, not 1.** The card timeline positions
+its tweens at computed fractions (`frac(22)`, `frac(-6)` …) assuming the timeline runs 0→1
+across the scroll range. But the last tween ended at 0.59, so GSAP reported the duration as
+0.59 and ScrollTrigger scrubbed 0→0.59 across the whole range — stretching every position by
+1/0.59. The card's exit therefore finished a whole screen later than intended, which is exactly
+the symptom that started this: a card still up while the next region was highlighted. Fix: a
+one-second no-op spacer, `ctl.to({}, { duration: 1 }, 0)`.
+
+**2. `fromTo` inside a timeline renders its from-state at build time.** All eight timelines are
+built at init, and step 2's spotlight tween starts from `autoAlpha: 1` (because step 1 has a
+region). Building it therefore turned the spotlight on at page load, over the intro, where no
+region exists. Fix: `immediateRender: false` on every `fromTo` in a scrubbed timeline, plus an
+explicit resting state set once after the timelines are built.
+
+**3. Measuring against the wrong box.** `stepVh` was computed as
+`step.height / stage.clientHeight`. On desktop the stage *is* the viewport so it was right; on
+phones the stage is only 45vh, so it returned 300 instead of 135 and every derived window was
+wrong. Fix: measure against `window.innerHeight`.
+
+All three were found with a scripted audit that walks the whole page and asserts two
+invariants — *at most one readable card at a time* and *zero overlap between a readable card
+and a visible spotlight* — rather than by scrolling and squinting.
+
+## B7. The reveal, the paws, the pins
+
+- **Card reveal** (`gsap.timeline`, `toggleActions: 'play reverse play reverse'`): card lifts
+  in → heading lines slide up from behind `overflow:hidden` masks (`.w > span`) → body lines
+  stagger → the photo wipes in via `clipPath: inset(0 100% 0 0)` while the image itself
+  un-zooms from `scale 1.2` — a Ken Burns that finishes exactly as the wipe lands.
+- **Paw trail** (~12 lines): 7 glyphs placed along the line between the previous and next
+  region's screen centres, rotated to the heading, alternating ±12px off the centreline,
+  staggered in with `back.out(2)` and out again.
+- **Pins**: drop in with `back.out(2.2)`; an expanding ring pulses on arrival. They live in the
+  camera layer so they ride the zoom, and counter-scale by `--inv` = `1/scale` so they stay a
+  constant size on screen. One CSS variable, no per-element maths.
+
+## B8. Responsive — a different shape, not a smaller one
+
+| | ≥900px | <900px |
 |---|---|---|
-| Headings | `"WWF"` woff, uppercase, 160%→180%, lh 1.2 | `.Theme-Layer-BodyText-Heading-Large` + `.Theme-TextSize-xxsmall` |
-| Body | Open Sans, #000, 17→18/20/22px steps | `.Theme-Story` |
-| Card | `#fff` @ 0.85, radius .5em | `.Theme-Overlay`, inline `opacity:0.85` |
-| Links | `#1155cc` underlined | custom class `zJLAtO` |
-| Dim | `#000` @ 0.5 | `.Theme-ScrollpointsSection .Theme-Scrollpoints` |
-| Spotlight | 4px solid `#2a6788`, 0.8s | `.Theme-Scrollpoints-Highlight` |
-| Rhythm | first card 85vh; 50vh/30vh per card; 20vh tail | `.Scrollpoints__point` rules |
-| Grid | card = 6/12 cols at offset 0/3/6; sm 10 cols; xs 12 | `Layout__col-*` classes |
-| Hotspots | e.g. Sambar `x48.5 y43 w17.1 h39.3` | `data-box` JSON in the original DOM |
+| Stage | 100dvh, full bleed | **45vh map window stuck to the top** |
+| Cards | pinned in one half of the screen, side alternating | pinned in the 55vh below the map |
+| Card motion | slides in and out through its own outer edge | **a horizontal carousel** — in from the right, out to the left |
+| Camera target | the half the card is not in | the centre of the map window |
+| Max zoom | 3.4× | 5× |
 
-All measured from the downloaded original (`research/` folder) — mention that
-you **reverse-engineered the stylesheet rather than eyeballing screenshots**.
+On both breakpoints the pin's top offset plus its height comes to exactly 100vh (desktop
+`0 + 100`, phones `45 + 55`), so one constant — `HOLD = stepVh - 100` — describes how long a
+card is held still on either. 🗣 *"The card cannot reach the map, because the map and the card
+are two separate boxes that add up to the screen. It is arithmetic, not judgement."*
 
-## B7. Accessibility — where the rebuild beats the original
+The phone treatment is a genuinely different shape rather than a squeezed desktop: the map gets
+a permanent window at the top so it is visible and zoomed the whole way down, and the cards
+behave like a deck being dealt sideways underneath it.
 
-- Original map has `alt=""` and all data is pixels → invisible to screen
-  readers. Rebuild: descriptive `alt` + a **visually-hidden `<table>`** with
-  all 14 countries' data.
-- `prefers-reduced-motion: reduce` disables spotlight travel, camera flights,
-  card reveals and smooth scroll.
-- Semantics: steps are `<article>`s, images use `<figure>/<figcaption>` with
-  preserved © credits, pins are focusable buttons.
-- No-JS: map renders (CSS cover), cards readable, frame hidden — content-first
-  progressive enhancement.
+Implemented as two `gsap.matchMedia()` contexts, so crossing the breakpoint reverts one set of
+ScrollTriggers and builds the other with no stale state. A third context handles
+`prefers-reduced-motion: reduce` — same content, states set instantly, no flights.
 
-## B8. Performance decisions
+Cards themselves are flex columns with a **shrinkable photo**: the picture gives up height
+before the text does, so a card can never outgrow the screen whatever an editor writes.
 
-- **Zero dependencies** — the engine is ~120 lines; GSAP (~80KB) or scrollama
-  would each be replaced by ~10 of those lines. (The brief explicitly asks to
-  justify dependency choices.)
-- Animations: transform/opacity/box-shadow-position — no layout properties;
-  the only geometry writes happen once per activation, not per frame.
-- `ResizeObserver` on the viewport (not window `resize` events) also catches
-  mobile URL-bar collapse (`100dvh` changes) and container resizes.
-- Images: photos resized 4096→1400px (9MB→1.4MB total), `loading="lazy"`
-  below the fold, map `fetchpriority="high"`, explicit width/height against CLS.
-- Double-boot guard (`data-scrollmap-ready`) + per-instance init → several
-  instances per page work (a CMS requirement).
+## B9. Accessibility
 
-# PART C — Task 2 plugin: file-by-file
+- The original ships the map with `alt=""` and every label is pixels. This build adds a
+  descriptive `alt` **and** a visually-hidden `<table>` with all 14 countries' counts, years
+  and trends.
+- `prefers-reduced-motion` is a first-class branch, not an afterthought.
+- Semantic `article` / `figure` / `figcaption`; real `<button>`s in the chapter rail with
+  `aria-current`; decorative layers `aria-hidden`.
+- Interaction is native scroll, so keyboard users get everything free.
+- No-JS: `.tgr:not(.is-ready)` undoes the sticky overlay — static map, readable stacked cards.
+
+## B10. Performance
+
+- Animated properties are `transform` and `opacity` only — compositor work, no layout.
+- GSAP 115KB, deferred, vendored, one request from our own origin.
+- Photos `loading="lazy"`; map `fetchpriority="high"` with explicit dimensions against CLS.
+- Geometry is measured on refresh, not per frame.
+- `will-change: transform` on the camera only.
+
+## B11. The two bugs
+
+**1. Two systems owning one property.** The map pins carried
+`transform: translate(-50%,-100%) scale(var(--inv))` in CSS, and the drop-in tween animated `y`
+on the same element. GSAP rewrites the whole `transform`, so the centring and the counter-scale
+vanished and pins rendered enormous at high zoom. Fix: GSAP animates an **inner** element; CSS
+owns the outer one.
+
+**2. Functional values evaluated before geometry existed.** `shots` was measured at the end of
+`init`, but the tweens were declared before it, so the first evaluation read `undefined` and
+the page threw `Cannot read properties of undefined (reading 'grade')`. Fix: `recompute()` runs
+before any tween is built, plus a `shotAt(i)` accessor with a wide-shot fallback.
+
+Both were found by screenshotting every chapter in headless Chromium with the console attached
+— not by clicking around.
+
+---
+
+# PART C — Task 2
 
 ## C1. `block.json` — the contract
 
-Single source of truth: attribute schema (typed, with defaults), asset
-wiring (`editorScript/editorStyle/style/viewScript`), and `render` pointing at
-`render.php`. WordPress auto-enqueues front-end assets **only when the block
-is on the page**, once per page regardless of instance count.
+Typed attribute schema with defaults, asset wiring, `supports.multiple: true`,
+`supports.html: false`, `render: file:./render.php`. Full model in
+[`02-CMS-INTEGRATION-PLAN.md`](02-CMS-INTEGRATION-PLAN.md) §1.
 
-Attribute model (mirrors `docs/02-CMS-INTEGRATION-PLAN.md` §1):
+🗣 *"Attributes, not a custom post type: copy-pasteable between pages, works in synced
+patterns, versions with post revisions — free rollback. A CPT would only pay off if one map
+were shared across many pages."*
 
-```jsonc
-backgroundImage: {id, url, alt, width, height}   // media library ID, not just URL
-dimOpacity, highlightColor, highlightWidth, travelMs, cardOpacity
-points: [{ id, align, heading, body(html), image{id,url,alt}, caption,
-           hotspot: {x,y,w,h} | null }]
-```
+## C2. `render.php` — server render
 
-Why attributes (not a custom post type): the webpart stays copy-pasteable
-between pages, works in synced patterns, and versions with post revisions —
-free rollback. A CPT would only pay off if one map were shared across many
-pages.
+Prints **exactly the Task 1 markup**, which is why `style.css` and `view.js` are shared. The
+security walk: every number re-clamped (the same rule as the editor's `clampBox`),
+`sanitize_hex_color()` on colours, `esc_attr`/`esc_url`/`esc_html` on scalars, and card HTML
+through `wp_kses` limited to `p br em strong u a[href|target|rel]` — a whitelist mirrored by
+the editor's `allowedFormats`, so the two ends cannot drift apart.
 
-## C2. `render.php` — server rendering
+`wp_get_attachment_image()` for every image → `srcset`, `sizes`, alt and lazy-loading free.
 
-- Emits **exactly the Task 1 markup** → `view.js`/`style.css` are shared
-  verbatim between standalone and CMS. That symmetry is the architecture's
-  core claim: *the standalone file was already shaped like CMS output*.
-- Security walk: `esc_attr/esc_url/esc_html` on every scalar,
-  `wp_kses($body, $allowed)` restricting card HTML to
-  `p/br/em/strong/u/a[href|target|rel]`, `sanitize_hex_color` for the colour,
-  numeric clamps re-applied server-side (never trust stored numbers).
-- `wp_get_attachment_image()` for both map and card images → automatic
-  `srcset/sizes`, media-library alt text, lazy loading.
-- Design tokens go out as **inline CSS custom properties** on the section —
-  per-instance theming with zero extra CSS.
-- Missing required image → editors see a red notice, visitors see nothing.
+One nice detail: `wwf_scrollmap_heading_lines()` splits the heading on **newlines** into the
+masked `.w > span` structure the reveal animates. 🗣 *"The editor controls line breaks by
+pressing Enter — typography stays an editorial decision, not an algorithm's."*
 
 ## C3. `editor.js` — the editing experience
 
-Built with plain `wp.element.createElement` — **no build step**, the plugin
-runs by mounting the folder. (Say: "in a product codebase this is JSX under
-`@wordpress/scripts`; I kept the demo dependency-free deliberately, same
-philosophy as Task 1.")
+Plain `wp.element.createElement`, no build step. The four brief requirements, mapped to code:
 
-The four Task 2 requirements, mapped to code:
+1. **Add via page editor** — `registerBlockType` + `block.json` metadata → it's in the `+`
+   inserter under "Scroll Map".
+2. **Enter/configure fields** — `InspectorControls` panels (Map, Motion, Colours, Chapters,
+   Chapter N); heading, status chip and rich body edited **inline in a live card preview**.
+3. **Edit / reorder / remove** — the Chapters repeater (select, ↑ ↓, duplicate, remove, add
+   map-or-text chapter), and the region itself **drawn on the map**: one pointer-handler set
+   covering draw / move / resize, all writing through a single `clampBox`.
+4. **Preview before publish** — the canvas is live, plus native WordPress draft preview with
+   device toggles.
 
-1. **Add via page editor** — `registerBlockType('wwf/scrollmap')` + block.json
-   metadata (title, icon, keywords) → it appears in the `+` inserter.
-2. **Enter/configure fields** — `InspectorControls` panels: map picker
-   (`MediaUpload`), design sliders (`RangeControl`), per-point align
-   (`RadioControl`), card image + caption; heading + rich body edited
-   **inline in a live card preview** (`RichText` with
-   `allowedFormats: bold/italic/link/underline` — matching exactly what
-   `render.php`'s `wp_kses` allows; the whitelist exists on both sides).
-3. **Edit/Reorder/Remove hotspots** — the Points panel is a repeater:
-   select row / ↑ / ↓ / 🗑 (immutable array ops: `map/filter/slice-swap` on
-   the attribute — undo/redo works for free because every change flows
-   through `setAttributes`). The hotspot itself is **drawn on the map**:
-   pointer-down/move/up on the canvas converts client px → image % and
-   rubber-bands a box (`clampBox` enforces 0–100 and x+w ≤ 100 on every
-   write path — sliders and drawing share it).
-4. **Preview before publish** — the canvas *is* the map with numbered boxes;
-   plus WordPress native Preview (draft → real front-end render, device
-   toggles). Nothing custom to build — that's an argument *for* the platform.
+Plus two things that aren't in the brief but sell the block:
 
-**Validation**: missing background image → `MediaPlaceholder` in the canvas,
-warning `Notice` in the sidebar, and `wp.data.dispatch('core/editor')
-.lockPostSaving()` — the Publish button physically disables. Try/catch guards
-contexts without the editor store (site editor/widgets).
+- **The layout guide** — ghost boxes on the canvas showing where the region will fly to and
+  where the card will sit. The "nothing covers the highlight" rule, visible at edit time.
+- **Two-tier validation** — hard rules call `lockPostSaving()` and list their reasons; soft
+  accessibility warnings only warn. 🗣 *"Blocking someone's publish over a missing alt text is
+  how you teach people to hate the CMS."*
 
-**Demo accelerator**: "Load tiger demo content" seeds the 8 real story points
-with the measured hotspot coordinates — full parity with the original in one
-click during the interview.
+Everything flows through `setAttributes`, so undo/redo and revisions work with no code from me.
 
-**Animation style control**: the sidebar "Map & design" panel exposes
-cinematic vs faithful as a per-instance radio (block attribute `mode` →
-`data-mode` in render.php → the same engine switch as the standalone file).
+**One usability fix found by testing:** three regions overlap over India, which made boxes
+unclickable. The selected box now lifts above the rest and its numbered badge is always
+clickable. Found because Playwright reported that a different box intercepted the click.
 
-**Site seeder** (`seed-demo.php`, run via `wp eval-file`): imports the 7
-images into the media library with alt text, builds the full block with
-`serialize_block()`, publishes the "Tiger Range Countries" page and sets it
-as the front page. Idempotent (attachments matched by slug, page by path) —
-this is how the live demo site was initialised, and it doubles as the answer
-to "how would you migrate existing content in?"
+## C4. Assets and dependencies in WordPress
 
-## C4. `view.js` / `style.css`
+GSAP and ScrollTrigger are vendored into the plugin and registered as **normal WordPress
+script handles** in `wwf-scrollmap.php`, with `view.asset.php` declaring them as dependencies
+of the view script. 🗣 *"Not a hard-coded `<script>` tag — as handles, WordPress deduplicates
+them if another plugin also wants GSAP, and loads them in the right order with `defer`."*
 
-Byte-for-byte the Task 1 engine and styles (minus the demo scaffolding), with
-a double-boot guard and DOMContentLoaded wrapper. One `<script>` per page
-serves any number of block instances.
+## C5. `seed-demo.php` and the migration story
 
-## C5. Portability answer (when they say "we don't use WordPress")
+Imports 7 images with alt text, builds the attribute payload, `serialize_block()`, publishes
+the page, sets it as the front page. Idempotent.
 
-The schema in C1 is plain JSON; the renderer consumes data-attributes; the
-engine is dependency-free. Porting = re-hosting the same three pieces:
+🗣 *"It's also my answer to 'how would you migrate existing content?' — a migration is a script
+that builds this array and hands it to `serialize_block()`. And it taught me a WordPress
+gotcha worth knowing: `wp_insert_post()` expects slashed data and calls `wp_unslash()`
+internally, so without `wp_slash()` the `\\u003c` escapes that `serialize_block()` produces get
+eaten and every block attribute comes back as literal `u003cpu003e` text. I saw that on the
+live page."*
+
+## C6. Portability
 
 | Target | Editing UI | Render |
 |---|---|---|
-| SharePoint (SPFx web part) | property pane + React canvas (same drawing code) | web part `render()` |
-| Drupal | paragraph type + nested point paragraphs | Twig template |
-| Headless (Contentful/Strapi) | component + repeatable entries | any front end + this view.js |
+| SharePoint (SPFx) | property pane + React canvas — the drawing code ports as-is | web part `render()` |
+| Drupal | paragraph type + nested chapter paragraphs | Twig template |
+| Headless (Contentful/Strapi/Sanity) | component + repeatable entries | any front end + this `view.js` |
 
-# PART D — Self code-review (strengths, criticisms, answers)
+The schema is plain JSON, the renderer consumes `data-` attributes, and the engine is
+framework-free. Porting is re-hosting the same three pieces.
 
-Present 2–3 of these unprompted — reviewers trust candidates who critique
-their own work.
+---
 
-**Legitimate criticisms & how I'd answer:**
+# PART D — self code-review
 
-0. *"You wrote a custom animation system — why not CSS transitions, WAAPI, or
-   GSAP?"* CSS transitions restart their curve on every retarget — visible
-   resets under fast scrolling. WAAPI has the same restart semantics unless
-   you manage composite modes manually. GSAP solves it but costs ~80KB for
-   what is here 25 lines of exponential smoothing. The spring is the smallest
-   thing that gives interruptibility, and the faithful mode proves I can also
-   just… use CSS transitions, matching the original exactly.
+Offer two or three of these unprompted.
 
-1. *"The box-shadow spread is 200vmax — isn't that a huge paint area?"*
-   It's one rectangle with a hard (non-blurred) shadow — a single solid paint,
-   cheap. The alternative (original's approach) rasterises the map bitmap
-   twice. If profiling ever showed it hot, I'd swap to `clip-path:
-   polygon(evenodd …)` — I kept box-shadow for older-Safari safety.
-2. *"Activation persists when no card is in the band"* (scroll fast and stop
-   between cards → last spotlight stays). Intentional and matches the
-   original; the alternative (clearing on exit) makes the dim flicker during
-   normal reading. The band size (16%) is tuned so gaps between cards are
-   short-lived.
-3. *"view.js and the standalone engine are duplicated"* — true, deliberate for
-   a self-contained assignment. Production: one source package, the standalone
-   file becomes a build artifact. I'd also add Playwright visual-regression
-   tests (I already screenshot-tested states in headless Chromium during dev).
-4. *"Heading is a plain input, not RichText"* — headings are `esc_html`-ed
-   plain strings by design (no markup in H2s), which sidesteps entity
-   double-encoding. Body text is the rich surface.
-5. *"Pin hit-areas are hand-estimated"* — yes, ±1% from the artwork; in the
-   CMS model they'd be drawn precisely with the same tool as the spotlight
-   boxes. In production I'd split the artwork into a clean base map + HTML
-   pins so the labels become editable, translatable and screen-readable.
-6. *"`multiline` RichText is soft-deprecated"* — acknowledged; the modern
-   pattern is InnerBlocks with core/paragraph. Chosen here to keep the point
-   data self-contained in one attribute (simpler migration story); I'd move
-   to InnerBlocks if cards ever needed mixed block content.
+1. *"You added a dependency you'd previously argued against."* — Correct, and I'll own it. The
+   zero-dependency version is in git; it was 250 lines of spring maths I'd have to defend line
+   by line, and its resize story was weaker than `invalidateOnRefresh`. I changed my mind when
+   the requirement changed from "travel a rectangle" to "fly a camera".
+2. *"200vmax box-shadow — isn't that a huge paint area?"* — One rectangle with a hard,
+   non-blurred shadow: a single solid paint. The alternative rasterises the map bitmap twice.
+   If profiling ever showed it hot I'd swap to `clip-path: polygon(evenodd …)`.
+3. *"`view.js` and `scrollmap.js` are duplicated."* — True, and deliberate for a
+   self-contained assignment. In production it's one source package and the standalone file is
+   a build artefact.
+4. *"Cards are capped in height on mobile — content can be clipped."* — The cap is what
+   guarantees the map stays visible, so I chose a visible constraint over a broken layout, and
+   the editor guide tells editors to keep phone-facing chapters short. The better fix is a
+   "read more" affordance on phones.
+5. *"The pins are decorative duplicates of the spotlight."* — Fair. They're toggleable, and
+   they exist mostly to demonstrate the counter-scale technique and give the wide shot life.
+6. *"`multiline` RichText is soft-deprecated."* — Acknowledged; the modern pattern is
+   InnerBlocks with `core/paragraph`. Chosen here to keep a chapter's data in one attribute,
+   which makes the migration story simpler. I'd move if cards needed mixed block content.
 
-**Strengths to state plainly:**
+**Strengths to state plainly**
 
-- Faithfulness is *measured*, not eyeballed (stylesheet values + extracted
-  hotspot JSON from the original DOM).
-- One data model drives standalone, desktop spotlight, mobile camera, and the
-  CMS editor — nothing is duplicated conceptually.
-- Security done properly on the CMS side (kses whitelist mirrored by editor
-  allowedFormats, escaping on every output, server-side re-clamping).
-- Accessibility exceeds the original (hidden data table, reduced motion,
-  focusable pins, semantic figures).
-
-# PART E — Live demo runbook
-
-**Task 1 (3 min)** — open `src/standalone/index.html`:
-1. Scroll slowly: map pins → intro card over bright map.
-2. Sambar: camera **pushes in**, spotlight fades in *in place* with the glow
-   pulse; next card → springs carry camera + spotlight together.
-3. **Scroll fast up and down** — the money shot: springs bend mid-flight,
-   nothing jumps or restarts. Say "CSS transitions can't do this."
-4. Progress rail: hover for labels, click a dot → smooth-jump to that point.
-5. Append `?mode=faithful` → the original's exact 0.8s CSS behaviour, no
-   zoom. Say "fidelity is one attribute away; cinematic is my proposal."
-6. DevTools responsive 390px: full camera flights between countries.
-7. DevTools → Rendering → emulate `prefers-reduced-motion` → everything snaps.
-8. Hover a country label → tooltip; Tab to a pin → keyboard tooltip.
-
-**Task 2 (4–5 min)** — stack is already seeded: http://localhost:8280
-(admin / admin), front page IS the webpart.
-1. Show the live front page first (rendered by render.php from block data).
-2. wp-admin → Pages → "Tiger Range Countries" → edit: the canvas shows the
-   map with 6 numbered hotspot boxes.
-3. Select the Sambar point → **Draw region on map** → drag a new box →
-   sliders sync; nudge X with the slider.
-4. Reorder a point (↑), delete one (🗑), undo (Ctrl+Z — free via attributes).
-5. Flip "Animation style" to Faithful → Update → reload front page: same
-   content, original behaviour.
-6. Fresh-block validation beat: add a new Scroll Map block on a new page →
-   Publish is locked until a map image is chosen.
-7. Preview → device toggles → Publish.
-
-**Total ~8 min, leaving time for the Part D discussion.**
+- Fidelity was *measured* — stylesheet values and hotspot JSON pulled from the original's DOM,
+  and the map framing caught by overlaying a screenshot of the original at the same viewport.
+- One data model drives the standalone, the desktop layout, the phone layout, the
+  reduced-motion path and the CMS editor.
+- Security done properly server-side: kses whitelist mirrored by the editor, escaping on every
+  output, numbers re-clamped on the server.
+- Accessibility exceeds the original in four concrete ways.
+- Both bugs I hit are interesting ones with transferable lessons, and I found them by
+  automating a browser rather than by clicking around.

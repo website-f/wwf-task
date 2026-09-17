@@ -371,12 +371,6 @@
             }
           });
 
-          /* A timeline's duration is the end of its LAST child, and
-             ScrollTrigger scrubs 0..duration across the range. Without this
-             one-second spacer the timeline was only ~0.59 long, so every
-             frac() position below was stretched by 1/0.59 and the card's exit
-             finished a whole screen later than intended — which is what left a
-             card on screen while the next region was already highlighted. */
           ctl.to({}, { duration: 1 }, 0);
 
           ctl.fromTo(step.card,
@@ -418,12 +412,7 @@
             y:     function () { return shotAt(i).y; },
             scale: function () { return shotAt(i).k; },
             duration: 1, ease: 'power2.inOut', immediateRender: false,
-            /* Which region the spotlight and the badge belong to, moment by
-               moment: for the first half of the flight we are still leaving
-               the old one (and it is fading out), after the midpoint we are
-               arriving at the new one (and it is fading in). Without this the
-               badge announced the next region while the frame was still drawn
-               around the previous one. */
+           
             onUpdate: function () {
               var ref = this.progress() >= 0.5 ? step : prev;
               if (!ref.spot) ref = step.spot ? step : prev;
@@ -432,13 +421,6 @@
             }
           }, 0);
 
-        /* The spotlight and its badge fade OUT early when leaving a region and
-           IN late when arriving, so the frame is never drawn over the wrong
-           part of the map mid-flight.
-           immediateRender:false matters here: a fromTo inside a timeline
-           renders its from-state at build time by default, so building step 2's
-           timeline was setting the frame to opacity 1 on page load, long before
-           any region existed. That was the stray spotlight over the intro. */
         tl.fromTo([frame, chip].filter(Boolean),
           { autoAlpha: prev.spot ? 1 : 0 },
           { autoAlpha: step.spot ? 1 : 0, duration: 0.3, ease: 'none', immediateRender: false },
@@ -453,18 +435,11 @@
         }
       });
 
-      /* Resting state for a page opened at the top: wide shot, no spotlight,
-         no card. Every timeline above is immediateRender:false, so nothing has
-         written to these yet; ScrollTrigger corrects them on its first refresh
-         if the page is restored mid-scroll. */
+     
       gsap.set(steps.map(function (st) { return st.card; }).filter(Boolean), { autoAlpha: 0 });
       gsap.set([frame, chip].filter(Boolean), { autoAlpha: 0 });
       if (grade) gsap.set(grade, { opacity: shotAt(0).grade });
 
-      /* ---- the content flourish, once per card -------------------------
-         Not scrubbed: it plays at its own pace once the card has arrived, and
-         reverses if you scroll back past it. It only ever touches the card's
-         CHILDREN, so by Rule 1 it can never fight the card's own timeline. */
       steps.forEach(function (step) {
         if (!step.card) return;
         var words   = step.card.querySelectorAll('.w > span');
